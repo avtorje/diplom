@@ -9,7 +9,7 @@ class ManageTestsForm(tk.Toplevel):
         super().__init__(parent)
         self.db = Database()
         self.title("Управление тестами")
-        self.geometry("400x300")  # Установить размеры окна
+        self.geometry("400x400")  # Установить размеры окна
         self.center_window()  # Вызвать метод центрирования окна
         self.parent = parent
         self.create_widgets()
@@ -17,10 +17,8 @@ class ManageTestsForm(tk.Toplevel):
 
     def create_widgets(self):
         tk.Label(self, text="Управление тестами", font=("Arial", 16)).pack(pady=10)
-
         self.tests_listbox = tk.Listbox(self)
         self.tests_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
-
         tk.Button(self, text="Добавить тест", command=self.add_test).pack(pady=5)
         tk.Button(self, text="Редактировать тест", command=self.edit_test).pack(pady=5)
         tk.Button(self, text="Удалить тест", command=self.delete_test).pack(pady=5)
@@ -57,7 +55,6 @@ class ManageTestsForm(tk.Toplevel):
         if not selected:
             messagebox.showerror("Ошибка", "Выберите тест для удаления.")
             return
-
         test_id = int(self.tests_listbox.get(selected[0]).split(":")[0])
         if messagebox.askyesno("Удалить тест", "Вы уверены, что хотите удалить этот тест?"):
             self.db.delete_test(test_id)
@@ -65,7 +62,8 @@ class ManageTestsForm(tk.Toplevel):
 
     def go_back(self):
         self.destroy()
-        self.parent.deiconify()
+        if self.parent is not None:
+            self.parent.deiconify()
 
     def center_window(self):
         """Центрирует окно на экране."""

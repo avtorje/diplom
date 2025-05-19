@@ -181,21 +181,84 @@ class EditTestForm(tk.Toplevel):
         for correct_answer in correct_answers:
             tk.Label(question_window, text=f"{correct_answer+1}. {options[correct_answer]}", font=("Arial", 12), fg="green").pack(pady=5)
 
-    def open_input_dialog(self, title, prompt):
-        """Открыть диалоговое окно для ввода текста."""
-        return simpledialog.askstring(title, prompt, parent=self)
+    def open_input_dialog(self, title, prompt, default=""):
+        import tkinter.simpledialog as simpledialog
+        return simpledialog.askstring(title, prompt, initialvalue=default, parent=self)
 
     def edit_question(self):
-        """Редактирование выбранного вопроса (заглушка)."""
-        messagebox.showinfo("Редактировать вопрос", "Функция редактирования пока не реализована.", parent=self)
+        """Редактирование выбранного вопроса."""
+        selected_index = self.questions_listbox.curselection()
+        if not selected_index:
+            messagebox.showerror("Ошибка", "Выберите вопрос для редактирования.", parent=self)
+            return
+
+        question = self.questions[selected_index[0]]
+
+        # Редактировать текст вопроса
+        new_question_text = self.open_input_dialog(
+            "Редактировать вопрос", "Введите новый текст вопроса:", question["text"]
+        )
+        if new_question_text is None:
+            return
+
+        # Изменить количество ответов
+        total_answers_str = self.open_input_dialog(
+            "Количество ответов",
+            "Введите новое общее количество ответов (2-10):",
+            str(len(question["options"]))
+        )
+        if total_answers_str is None or not total_answers_str.isdigit() or not (2 <= int(total_answers_str) <= 10):
+            messagebox.showerror("Ошибка", "Количество ответов должно быть числом от 2 до 10.", parent=self)
+            return
+        total_answers = int(total_answers_str)
+
+        # Редактировать варианты ответов
+        new_options = []
+        for i in range(total_answers):
+            default = question["options"][i] if i < len(question["options"]) else ""
+            option_text = self.open_input_dialog(
+                "Вариант ответа", f"Введите текст варианта ответа {i+1}:", default
+            )
+            if not option_text or not option_text.strip():
+                messagebox.showerror("Ошибка", f"Вариант ответа {i+1} не может быть пустым.", parent=self)
+                return
+            new_options.append(option_text.strip())
+
+        # Ввести правильные ответы
+        correct_def = ", ".join(
+            str(idx + 1) for idx in question["correct_option"] if idx < total_answers
+        )
+        correct_answers_str = self.open_input_dialog(
+            "Правильные ответы",
+            f"Введите номера правильных ответов через запятую (1-{total_answers}):",
+            correct_def
+        )
+        if not correct_answers_str:
+            messagebox.showerror("Ошибка", "Необходимо указать хотя бы один правильный ответ.", parent=self)
+            return
+        try:
+            correct_indices = [int(x.strip()) - 1 for x in correct_answers_str.split(",")]
+            if not all(0 <= idx < total_answers for idx in correct_indices):
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Ошибка", "Некорректные номера правильных ответов.", parent=self)
+            return
+
+        # Обновить вопрос в базе
+        self.db.update_question(question["id"], new_question_text, new_options, correct_indices)
+        self.questions = self.db.get_questions(self.test_id)
+        self.load_questions()
+        messagebox.showinfo("Успешно", "Вопрос успешно обновлён.", parent=self)
 
     def delete_question(self):
         """Удаление выбранного вопроса (заглушка)."""
         messagebox.showinfo("Удалить вопрос", "Функция удаления пока не реализована.", parent=self)
 
     def go_back(self):
-        """Вернуться назад (заглушка)."""
+        """Вернуться к списку тестов."""
         self.destroy()
+        if self.parent is not None:
+            self.parent.deiconify()
 
     def center_window(self, window=None):
         if window is None:

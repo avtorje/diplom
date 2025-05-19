@@ -148,12 +148,39 @@ class Database:
                 )
             conn.commit()
 
-    def delete_question(self, question_id):
-        """Удаление вопроса и связанных с ним данных."""
+    def delete_test(self, test_id):
+        """Удаление теста (темы), всех его вопросов и ответов."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            # Найти все вопросы этого теста
+            cursor.execute("SELECT id FROM QUESTION WHERE theme_id = ?", (test_id,))
+            question_ids = [row[0] for row in cursor.fetchall()]
+            # Удалить все ответы
+            for qid in question_ids:
+                cursor.execute("DELETE FROM ANSWER WHERE question_id = ?", (qid,))
+            # Удалить все вопросы
+            cursor.execute("DELETE FROM QUESTION WHERE theme_id = ?", (test_id,))
+            # Удалить сам тест
+            cursor.execute("DELETE FROM THEME WHERE id = ?", (test_id,))
+            conn.commit()
+
+    def update_question(self, question_id, text, options, correct_options):
+        """Обновление вопроса и его ответов."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # Обновить текст и правильные ответы
+            cursor.execute(
+                "UPDATE QUESTION SET text = ?, correct_option = ? WHERE id = ?",
+                (text, ",".join(map(str, correct_options)), question_id)
+            )
+            # Удалить старые варианты ответа
             cursor.execute("DELETE FROM ANSWER WHERE question_id = ?", (question_id,))
-            cursor.execute("DELETE FROM QUESTION WHERE id = ?", (question_id,))
+            # Добавить новые варианты ответа
+            for option in options:
+                cursor.execute(
+                    "INSERT INTO ANSWER (question_id, text) VALUES (?, ?)",
+                    (question_id, option)
+                )
             conn.commit()
 
     def get_next_local_question_number(self, theme_id, cursor):
