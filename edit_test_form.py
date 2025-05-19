@@ -30,10 +30,11 @@ class EditTestForm(tk.Toplevel):
         tk.Button(self, text="Назад", command=self.go_back).pack(pady=5)
 
     def load_questions(self):
+        """Загрузка всех вопросов для текущего теста."""
         self.questions_listbox.delete(0, tk.END)
         for question in self.questions:
-            self.questions_listbox.insert(tk.END, f"{question['id']}: {question['text']}")
-
+            self.questions_listbox.insert(tk.END, f"{question['theme_local_number']}: {question['text']}")
+        
     def add_question(self):
         """Добавление нового вопроса."""
         try:
@@ -206,5 +207,19 @@ class EditTestForm(tk.Toplevel):
         y = (self.winfo_screenheight() // 2) - (height // 2)
         window.geometry(f"+{x}+{y}")
 
+    def delete_question(self):
+        """Удаление выбранного вопроса."""
+        selected_index = self.questions_listbox.curselection()
+        if not selected_index:
+            messagebox.showerror("Ошибка", "Выберите вопрос для удаления.", parent=self)
+            return
 
+        question = self.questions[selected_index[0]]
+        question_id = question["id"]
+
+        if messagebox.askyesno("Удаление вопроса", f"Вы уверены, что хотите удалить вопрос №{question['theme_local_number']}?", parent=self):
+            self.db.delete_question(question_id)
+            self.questions = self.db.get_questions(self.test_id)
+            self.load_questions()
+            messagebox.showinfo("Вопрос удалён", f"Вопрос №{question['theme_local_number']} успешно удалён.", parent=self)
 

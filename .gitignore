@@ -1,0 +1,20 @@
+# Кэш Python
+__pycache__/
+*.pyc
+
+# Локальная база данных
+*.db
+
+# Настройки редакторов (если используешь VS Code или PyCharm)
+.vscode/
+.idea/
+
+# Файлы логов
+*.log
+
+# Скрипт запуска (если не нужен на GitHub)
+run.bat
+
+# Системные файлы Windows
+Thumbs.db
+Desktop.ini
