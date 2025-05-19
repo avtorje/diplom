@@ -26,14 +26,15 @@ class Database:
     def check_admin_password(self, admin_id, password):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT password FROM ADMIN WHERE id=?", (admin_id,))
+            cursor.execute("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
             row = cursor.fetchone()
-            return row and row[0] == password  # если пароли в открытом виде
+            # сравниваем хэш
+            return row and row[0] == self.hash_password(password)
 
     def update_admin_password(self, admin_id, new_password):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE ADMIN SET password=? WHERE id=?", (new_password, admin_id))
+            cursor.execute("UPDATE USERS SET password=? WHERE id=? AND role='admin'", (self.hash_password(new_password), admin_id))
             conn.commit()
 
     def initialize(self):
