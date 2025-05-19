@@ -162,5 +162,8 @@ class Database:
         self._execute("DELETE FROM QUESTION WHERE id = ?", (question_id,))
 
     def update_theme_local_number(self, question_id, new_number):
-        self._execute("UPDATE QUESTION SET theme_local_number=? WHERE id=?", (new_number, question_id))
-
+        import sqlite3
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE QUESTION SET theme_local_number = ? WHERE id = ?", (new_number, question_id))
+            conn.commit()

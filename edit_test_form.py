@@ -79,20 +79,65 @@ class EditTestForm(tk.Toplevel):
 
     def add_question(self):
         try:
-            data = self.ask_question_data()
-            if not data:
+            question_text = self.open_input_dialog("Добавить вопрос", "Введите текст нового вопроса:")
+            if not question_text:
                 return
-            question_text, options, correct_answers = data
+
+            # --- Проверка на уникальность текста вопроса ---
+            for q in self.questions:
+                if q['text'].strip().lower() == question_text.strip().lower():
+                    messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
+                    return
+
+            total_answers = self.open_input_dialog(
+                "Количество ответов", "Введите общее количество ответов (2-10):"
+            )
+            if not total_answers or not total_answers.isdigit() or not (2 <= int(total_answers) <= 10):
+                messagebox.showerror("Ошибка", "Количество ответов должно быть числом от 2 до 10.", parent=self)
+                return
+            total_answers = int(total_answers)
+
+            options = []
+            for i in range(total_answers):
+                option = self.open_input_dialog(
+                    "Добавить вариант ответа", f"Введите текст варианта ответа {i + 1}:"
+                )
+                if option and option.strip():
+                    options.append(option.strip())
+                else:
+                    messagebox.showerror("Ошибка", f"Вариант ответа {i + 1} не может быть пустым.", parent=self)
+                    return
+
+            correct_answers = self.open_input_dialog(
+                "Правильные ответы",
+                f"Введите номера правильных ответов через запятую (1-{total_answers}):"
+            )
+            if not correct_answers:
+                messagebox.showerror("Ошибка", "Необходимо указать хотя бы один правильный ответ.", parent=self)
+                return
+
+            try:
+                parts = [x.strip() for x in correct_answers.split(",")]
+                if "" in parts:
+                    raise ValueError("Обнаружены пустые значения.")
+
+                correct_answers = list(set(int(x) - 1 for x in parts))
+            except ValueError:
+                messagebox.showerror("Ошибка", "Номера правильных ответов должны быть целыми числами без пропусков.", parent=self)
+                return
+
+            if not correct_answers or not all(0 <= x < total_answers for x in correct_answers):
+                messagebox.showerror(
+                    "Ошибка", f"Номера правильных ответов должны быть в диапазоне от 1 до {total_answers}.", parent=self
+                )
+                return
+
             self.db.add_question(self.test_id, question_text, options, correct_answers)
             self.questions = self.db.get_questions(self.test_id)
             self.load_questions()
             messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{question_text}", parent=self)
-        except sqlite3.OperationalError as e:
-            if e.args[0] == "database is locked":
-                time.sleep(0.1)
-                self.add_question()
-            else:
-                raise
+        except Exception as e:
+            messagebox.showerror("Ошибка", str(e), parent=self)
 
     def view_question(self):
         selected_index = self.questions_listbox.curselection()
@@ -184,17 +229,27 @@ class EditTestForm(tk.Toplevel):
         messagebox.showinfo("Успешно", "Вопрос успешно обновлён.", parent=self)
 
     def delete_question(self):
-        selected_index = self.questions_listbox.curselection()
-        if not selected_index:
+        selected_indices = self.questions_listbox.curselection()
+        if not selected_indices:
             messagebox.showerror("Ошибка", "Выберите вопрос для удаления.", parent=self)
             return
-        question = self.questions[selected_index[0]]
+        selected_index = selected_indices[0]
+        question = self.questions[selected_index]
         question_id = question["id"]
+
         if messagebox.askyesno("Удаление вопроса", f"Вы уверены, что хотите удалить вопрос №{question['theme_local_number']}?", parent=self):
             self.db.delete_question(question_id)
             self.questions = self.db.get_questions(self.test_id)
+            self.renumber_questions()
+            self.questions = self.db.get_questions(self.test_id)
             self.load_questions()
-            messagebox.showinfo("Вопрос удалён", f"Вопрос №{question['theme_local_number']} успешно удалён.", parent=self)
+            messagebox.showinfo("Вопрос удалён", f"Вопрос успешно удалён.", parent=self)
+
+    def renumber_questions(self):
+        """Переустанавливает порядковые номера вопросов в тесте после удаления."""
+        for idx, question in enumerate(self.questions):
+            if question['theme_local_number'] != idx + 1:
+                self.db.update_theme_local_number(question['id'], idx + 1)
 
     def go_back(self):
         self.destroy()
