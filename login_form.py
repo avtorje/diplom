@@ -36,7 +36,7 @@ class LoginForm(tk.Tk):
             if role == "admin":
                 messagebox.showinfo("Успешно", "Добро пожаловать, администратор!")
                 self.destroy()
-                AdminForm().mainloop()
+                AdminForm(user[0]).mainloop()
             else:
                 messagebox.showinfo("Успешно", "Добро пожаловать, студент!")
                 self.destroy()

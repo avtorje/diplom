@@ -3,11 +3,14 @@ from tkinter import messagebox
 from manage_tests_form import ManageTestsForm
 from manage_users_form import ManageUsersForm
 from statistics_form import StatisticsForm
+from database import Database
 
 
 class AdminForm(tk.Tk):
-    def __init__(self):
+    def __init__(self, admin_id):
         super().__init__()
+        self.db = Database()
+        self.admin_id = admin_id
         self.title("Панель администратора")
         self.geometry("400x300")
         self.center_window()
@@ -19,8 +22,31 @@ class AdminForm(tk.Tk):
         tk.Button(self, text="Управление тестами", command=self.open_manage_tests).pack(pady=5)
         tk.Button(self, text="Управление пользователями", command=self.open_manage_users).pack(pady=5)
         tk.Button(self, text="Просмотр статистики", command=self.open_statistics).pack(pady=5)
+        tk.Button(self, text="Изменить пароль", command=self.change_password).pack(pady=5)
         tk.Button(self, text="Назад", command=self.go_back).pack(pady=5)
         tk.Button(self, text="Выход", command=self.exit_app).pack(pady=5)
+
+    def change_password(self):
+        from tkinter import messagebox, simpledialog
+
+        old_password = simpledialog.askstring("Старый пароль", "Введите старый пароль:", show='*', parent=self)
+        if not old_password:
+            return
+
+        if not self.db.check_admin_password(self.admin_id, old_password):
+            messagebox.showerror("Ошибка", "Старый пароль неверный.", parent=self)
+            return
+
+        new_password = simpledialog.askstring("Новый пароль", "Введите новый пароль:", show='*', parent=self)
+        if not new_password:
+            return
+        confirm_password = simpledialog.askstring("Подтверждение", "Повторите новый пароль:", show='*', parent=self)
+        if new_password != confirm_password:
+            messagebox.showerror("Ошибка", "Пароли не совпадают.", parent=self)
+            return
+
+        self.db.update_admin_password(self.admin_id, new_password)
+        messagebox.showinfo("Успешно", "Пароль успешно изменён!", parent=self)
 
     def open_manage_tests(self):
         self.withdraw()  # Скрыть текущее окно

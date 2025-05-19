@@ -16,6 +16,25 @@ class Database:
                 return cursor.fetchall()
             conn.commit()
             return cursor
+    
+    def update_theme_local_number(self, question_id, new_number):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE QUESTION SET theme_local_number = ? WHERE id = ?", (new_number, question_id))
+            conn.commit()
+
+    def check_admin_password(self, admin_id, password):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT password FROM ADMIN WHERE id=?", (admin_id,))
+            row = cursor.fetchone()
+            return row and row[0] == password  # если пароли в открытом виде
+
+    def update_admin_password(self, admin_id, new_password):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE ADMIN SET password=? WHERE id=?", (new_password, admin_id))
+            conn.commit()
 
     def initialize(self):
         self._create_tables()
