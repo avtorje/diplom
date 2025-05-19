@@ -183,6 +183,14 @@ class Database:
                 )
             conn.commit()
 
+    def delete_question(self, question_id):
+        """Удаление вопроса и всех связанных с ним ответов."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM ANSWER WHERE question_id = ?", (question_id,))
+            cursor.execute("DELETE FROM QUESTION WHERE id = ?", (question_id,))
+            conn.commit()
+
     def get_next_local_question_number(self, theme_id, cursor):
         """Получение следующего локального номера вопроса для указанной темы (теста)."""
         cursor.execute(

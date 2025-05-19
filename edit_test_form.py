@@ -162,25 +162,51 @@ class EditTestForm(tk.Toplevel):
         # Создает новое окно для отображения вопроса и ответов.
         question_window = tk.Toplevel(self)
         question_window.title("Просмотр вопроса")
-
         self.center_window(question_window)
-
         question_window.geometry("400x400")
 
+        # --- Начало: добавляем скроллинг ---
+        canvas = tk.Canvas(question_window, borderwidth=0, background="#f0f0f0")
+        frame = tk.Frame(canvas, background="#f0f0f0")
+        vscrollbar = tk.Scrollbar(question_window, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vscrollbar.set)
 
-        # Показывает текст вопроса.
-        tk.Label(question_window, text=question_text, font=("Arial", 14)).pack(pady=10)
+        vscrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        canvas.create_window((0,0), window=frame, anchor="nw")
+
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        frame.bind("<Configure>", on_frame_configure)
+        # --- Конец: добавляем скроллинг ---
+
+        # Показывает текст вопроса, выравнивание по центру
+        tk.Label(
+            frame,
+            text=question_text,
+            font=("Arial", 14),
+            background="#f0f0f0",
+            anchor="center",
+            justify="center"
+        ).pack(pady=10, fill="x")
 
         # Показывает варианты ответов.
-        tk.Label(question_window, text="Варианты ответов:", font=("Arial", 12)).pack(pady=5)
+        tk.Label(frame, text="Варианты ответов:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
         for i, option in enumerate(options):
-            tk.Label(question_window, text=f"{i+1}. {option}", font=("Arial", 12)).pack(pady=5)
+            tk.Label(frame, text=f"{i+1}. {option}", font=("Arial", 12), background="#f0f0f0").pack(pady=5, anchor="w")
 
         # Показывает правильные ответы.
-        tk.Label(question_window, text="Правильные ответы:", font=("Arial", 12)).pack(pady=5)
+        tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
         for correct_answer in correct_answers:
-            tk.Label(question_window, text=f"{correct_answer+1}. {options[correct_answer]}", font=("Arial", 12), fg="green").pack(pady=5)
-
+            tk.Label(
+                frame,
+                text=f"{correct_answer+1}. {options[correct_answer]}",
+                font=("Arial", 12),
+                fg="green",
+                background="#f0f0f0"
+            ).pack(pady=5, anchor="w")
+            
     def open_input_dialog(self, title, prompt, default=""):
         import tkinter.simpledialog as simpledialog
         return simpledialog.askstring(title, prompt, initialvalue=default, parent=self)
