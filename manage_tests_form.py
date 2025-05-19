@@ -26,9 +26,9 @@ class ManageTestsForm(tk.Toplevel):
 
     def load_tests(self):
         self.tests_listbox.delete(0, tk.END)
-        tests = self.db.get_all_tests()
-        for test in tests:
-            self.tests_listbox.insert(tk.END, f"{test[0]}: {test[1]}")
+        self.tests = self.db.get_all_tests()  # Сохраняем список тестов!
+        for idx, test in enumerate(self.tests, 1):
+            self.tests_listbox.insert(tk.END, f"{idx}. {test[1]}")
 
     def add_test(self):
         test_name = simpledialog.askstring("Добавить тест", "Введите название нового теста:")
@@ -45,8 +45,7 @@ class ManageTestsForm(tk.Toplevel):
         if not selected:
             messagebox.showerror("Ошибка", "Выберите тест для редактирования.")
             return
-
-        test_id = int(self.tests_listbox.get(selected[0]).split(":")[0])
+        test_id = self.tests[selected[0]][0]  # Берём id из списка tests!
         self.withdraw()
         EditTestForm(self, test_id).mainloop()
 
@@ -55,7 +54,7 @@ class ManageTestsForm(tk.Toplevel):
         if not selected:
             messagebox.showerror("Ошибка", "Выберите тест для удаления.")
             return
-        test_id = int(self.tests_listbox.get(selected[0]).split(":")[0])
+        test_id = self.tests[selected[0]][0]
         if messagebox.askyesno("Удалить тест", "Вы уверены, что хотите удалить этот тест?"):
             self.db.delete_test(test_id)
             self.load_tests()

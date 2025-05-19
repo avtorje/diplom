@@ -35,7 +35,7 @@ class AdminForm(tk.Tk):
         StatisticsForm(self).mainloop()
 
     def go_back(self):
-        if messagebox.askyesno("Вернуться", "Вы уверены, что хотите вернуться в главное меню?"):
+        if messagebox.askyesno("Вернуться", "Вы уверены, что хотите вернуться в меню регистрации?"):
             self.destroy()
             from login_form import LoginForm
             LoginForm().mainloop()
