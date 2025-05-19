@@ -148,7 +148,9 @@ class EditTestForm(tk.Toplevel):
         messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{question_text}", parent=self)
 
     def view_question(self):
-        """Просмотр выбранного вопроса с ответами и выделение правильных ответов."""
+        import tkinter as tk
+        from tkinter import messagebox
+
         selected_index = self.questions_listbox.curselection()
         if not selected_index:
             messagebox.showerror("Ошибка", "Выберите вопрос для просмотра.", parent=self)
@@ -159,13 +161,12 @@ class EditTestForm(tk.Toplevel):
         options = question['options']
         correct_answers = question.get('correct_option', [])
 
-        # Создает новое окно для отображения вопроса и ответов.
         question_window = tk.Toplevel(self)
         question_window.title("Просмотр вопроса")
         self.center_window(question_window)
         question_window.geometry("400x400")
 
-        # --- Начало: добавляем скроллинг ---
+        # --- Скроллинг ---
         canvas = tk.Canvas(question_window, borderwidth=0, background="#f0f0f0")
         frame = tk.Frame(canvas, background="#f0f0f0")
         vscrollbar = tk.Scrollbar(question_window, orient="vertical", command=canvas.yview)
@@ -173,39 +174,75 @@ class EditTestForm(tk.Toplevel):
 
         vscrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-        canvas.create_window((0,0), window=frame, anchor="nw")
+        canvas.create_window((20, 0), window=frame, anchor="nw")
 
         def on_frame_configure(event):
             canvas.configure(scrollregion=canvas.bbox("all"))
-
         frame.bind("<Configure>", on_frame_configure)
-        # --- Конец: добавляем скроллинг ---
 
-        # Показывает текст вопроса, выравнивание по центру
-        tk.Label(
+        # --- ВОПРОС: динамический перенос и выравнивание по центру ---
+        question_label = tk.Label(
             frame,
             text=question_text,
             font=("Arial", 14),
             background="#f0f0f0",
             anchor="center",
             justify="center"
-        ).pack(pady=10, fill="x")
+        )
+        question_label.pack(pady=10, fill="x")
 
-        # Показывает варианты ответов.
+        # --- ОТВЕТЫ: добавим перенос текста для каждого ответа ---
+        answer_labels = []
+
         tk.Label(frame, text="Варианты ответов:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
         for i, option in enumerate(options):
-            tk.Label(frame, text=f"{i+1}. {option}", font=("Arial", 12), background="#f0f0f0").pack(pady=5, anchor="w")
+            lbl = tk.Label(
+                frame,
+                text=f"{i+1}. {option}",
+                font=("Arial", 12),
+                background="#f0f0f0",
+                anchor="w",  # выравнивание оставить как было
+                justify="left"
+            )
+            lbl.pack(pady=5, anchor="w", fill="x")
+            answer_labels.append(lbl)
 
-        # Показывает правильные ответы.
         tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
+        correct_labels = []
         for correct_answer in correct_answers:
-            tk.Label(
+            lbl = tk.Label(
                 frame,
                 text=f"{correct_answer+1}. {options[correct_answer]}",
                 font=("Arial", 12),
                 fg="green",
-                background="#f0f0f0"
-            ).pack(pady=5, anchor="w")
+                background="#f0f0f0",
+                anchor="w",
+                justify="left"
+            )
+            lbl.pack(pady=5, anchor="w", fill="x")
+            correct_labels.append(lbl)
+
+        # --- Функция динамического обновления wraplength для вопроса и всех ответов ---
+        def update_wraplength(event):
+            w = event.width - 40
+            if w < 100:
+                w = 100
+            question_label.config(wraplength=w)
+            for lbl in answer_labels:
+                lbl.config(wraplength=w)
+            for lbl in correct_labels:
+                lbl.config(wraplength=w)
+
+        canvas.bind("<Configure>", update_wraplength)
+        question_window.update_idletasks()
+        initial_width = canvas.winfo_width() - 40
+        if initial_width < 100:
+            initial_width = 100
+        question_label.config(wraplength=initial_width)
+        for lbl in answer_labels:
+            lbl.config(wraplength=initial_width)
+        for lbl in correct_labels:
+            lbl.config(wraplength=initial_width)
             
     def open_input_dialog(self, title, prompt, default=""):
         import tkinter.simpledialog as simpledialog
