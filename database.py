@@ -16,7 +16,7 @@ class Database:
                 return cursor.fetchall()
             conn.commit()
             return cursor
-    
+
     def update_theme_local_number(self, question_id, new_number):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -44,21 +44,21 @@ class Database:
     def _create_tables(self):
         tables = [
             """CREATE TABLE IF NOT EXISTS GROUPS (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            access_code TEXT NOT NULL
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                access_code TEXT NOT NULL
             )""",
             """CREATE TABLE IF NOT EXISTS USERS (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL,
-            first_name TEXT,
-            last_name TEXT,
-            middle_name TEXT,
-            group_id INTEGER,
-            FOREIGN KEY (group_id) REFERENCES GROUPS(id)
-         )""",
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password TEXT,
+                role TEXT NOT NULL,
+                first_name TEXT,
+                last_name TEXT,
+                middle_name TEXT,
+                group_id INTEGER,
+                FOREIGN KEY (group_id) REFERENCES GROUPS(id)
+            )""",
             """CREATE TABLE IF NOT EXISTS THEME (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE
@@ -102,16 +102,62 @@ class Database:
     def get_groups(self):
         return self._execute("SELECT id, name FROM GROUPS", fetch=True)
 
-    def get_group_by_name(self, group_name):
-        result = self._execute("SELECT id, name, access_code FROM GROUPS WHERE name=?", (group_name,), fetch=True)
-        return {'id': result[0][0], 'name': result[0][1], 'access_code': result[0][2]} if result else None
+    def add_group(self, name, access_code):
+        self._execute("INSERT INTO GROUPS (name, access_code) VALUES (?, ?)", (name, access_code))
 
-    def get_students_by_group(self, group_id):
-        return self._execute("SELECT id, username FROM USERS WHERE group_id=? AND role='student'", (group_id,), fetch=True)
+    def edit_group(self, group_id, name, access_code):
+        self._execute("UPDATE GROUPS SET name=?, access_code=? WHERE id=?", (name, access_code, group_id))
 
-    def get_user_by_name_and_group(self, username, group_id):
-        result = self._execute("SELECT * FROM USERS WHERE username=? AND group_id=? AND role='student'", (username, group_id), fetch=True)
+    def delete_group(self, group_id):
+        self._execute("DELETE FROM GROUPS WHERE id=?", (group_id,))
+
+    def get_group_by_id(self, group_id):
+        result = self._execute("SELECT id, name, access_code FROM GROUPS WHERE id=?", (group_id,), fetch=True)
         return result[0] if result else None
+
+    # --------- Исправленные методы для пользователей ---------
+    def add_user(self, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
+        if role == "admin":
+            self._execute(
+                "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, self.hash_password(password), role, group_id, first_name, last_name, middle_name)
+            )
+        else:
+            self._execute(
+                "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, NULL, ?, ?, ?, ?, ?)",
+                (username, role, group_id, first_name, last_name, middle_name)
+            )
+
+    def update_user(self, user_id, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
+        if role == "admin":
+            self._execute(
+                "UPDATE USERS SET username=?, password=?, role=?, group_id=?, first_name=?, last_name=?, middle_name=? WHERE id=?",
+                (username, self.hash_password(password), role, group_id, first_name, last_name, middle_name, user_id)
+            )
+        else:
+            self._execute(
+                "UPDATE USERS SET username=?, password=NULL, role=?, group_id=?, first_name=?, last_name=?, middle_name=? WHERE id=?",
+                (username, role, group_id, first_name, last_name, middle_name, user_id)
+            )
+    # --------------------------------------------------------
+
+    def delete_user(self, user_id):
+        self._execute("DELETE FROM USERS WHERE id=?", (user_id,))
+
+    def get_user_by_id(self, user_id):
+        result = self._execute(
+            "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE id = ?",
+            (user_id,),
+            fetch=True
+        )
+        return result[0] if result else None
+
+    def get_all_users(self):
+        """Возвращает список всех пользователей"""
+        return self._execute(
+            "SELECT id, username, first_name, role, group_id FROM USERS",
+            fetch=True
+        )
 
     @staticmethod
     def hash_password(password):
@@ -203,7 +249,6 @@ class Database:
         self._execute("DELETE FROM QUESTION WHERE id = ?", (question_id,))
 
     def update_theme_local_number(self, question_id, new_number):
-        import sqlite3
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE QUESTION SET theme_local_number = ? WHERE id = ?", (new_number, question_id))
