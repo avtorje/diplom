@@ -1,13 +1,14 @@
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 from database import Database
+from group_users_form import GroupUsersForm
 
 class GroupsForm(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.db = Database()
         self.title("Управление группами")
-        self.geometry("400x300")
+        self.geometry("400x400")
         self.parent = parent
         self.create_widgets()
         self.load_groups()
@@ -16,15 +17,24 @@ class GroupsForm(tk.Toplevel):
         tk.Label(self, text="Список групп", font=("Arial", 14)).pack(pady=10)
         self.groups_listbox = tk.Listbox(self)
         self.groups_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
+        self.groups_listbox.bind("<<ListboxSelect>>", self.on_group_select)
         tk.Button(self, text="Добавить группу", command=self.add_group).pack(pady=5)
         tk.Button(self, text="Редактировать группу", command=self.edit_group).pack(pady=5)
         tk.Button(self, text="Удалить группу", command=self.delete_group).pack(pady=5)
+        tk.Button(self, text="Закрыть", command=self.destroy).pack(pady=5)
 
     def load_groups(self):
         self.groups_listbox.delete(0, tk.END)
-        groups = self.db.get_groups()
-        for group in groups:
+        self.groups = self.db.get_groups()
+        for group in self.groups:
             self.groups_listbox.insert(tk.END, f"{group[0]}: {group[1]}")
+
+    def on_group_select(self, event):
+        idx = self.groups_listbox.curselection()
+        if not idx:
+            return
+        group_id = self.groups[idx[0]][0]
+        GroupUsersForm(self, group_id)
 
     def add_group(self):
         name = simpledialog.askstring("Имя группы", "Введите название группы:", parent=self)

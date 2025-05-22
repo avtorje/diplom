@@ -90,6 +90,25 @@ class Database:
         for table in tables:
             self._execute(table)
 
+    def get_main_admin(self):
+        """Возвращает первого (главного) администратора"""
+        result = self._execute(
+            "SELECT id, username, first_name, last_name, middle_name, role FROM USERS WHERE role = 'admin' ORDER BY id ASC LIMIT 1",
+            fetch=True
+        )
+        return result[0] if result else None
+
+    def get_group_users(self, group_id, exclude_main_admin=True):
+        """Возвращает пользователей группы (студенты и админы этой группы, кроме главного админа)"""
+        query = "SELECT id, username, first_name, last_name, middle_name, role FROM USERS WHERE group_id = ?"
+        params = [group_id]
+        if exclude_main_admin:
+            main_admin = self.get_main_admin()
+            if main_admin:
+                query += " AND id != ?"
+                params.append(main_admin[0])
+        return self._execute(query, tuple(params), fetch=True)
+
     def _add_admin_user(self):
         try:
             self._execute(
@@ -98,6 +117,34 @@ class Database:
             )
         except sqlite3.IntegrityError:
             pass
+
+    # --- Новый метод: Получение главного администратора ---
+    def get_main_admin(self):
+        # Считаем главным администратора с username = 'admin' (создаётся при инициализации)
+        result = self._execute("SELECT id, username, role FROM USERS WHERE role='admin' AND username='admin'", fetch=True)
+        return result[0] if result else None
+
+    # --- Новый метод: Получение админов по id группы (кроме главного) ---
+    def get_admins_by_group(self, group_id):
+        return self._execute(
+            "SELECT id, username, role FROM USERS WHERE role='admin' AND username != 'admin' AND group_id = ?",
+            (group_id,),
+            fetch=True
+        )
+    
+    # --- Новый метод: Получение студентов по id группы ---
+    def get_students_by_group(self, group_id):
+        return self._execute(
+            "SELECT id, username, role FROM USERS WHERE role='student' AND group_id = ?",
+            (group_id,),
+            fetch=True
+        )
+    
+    # --- Получить пользователей для общего списка (только главный админ) ---
+    def get_users_main_list(self):
+        # Только главный админ в общем списке
+        main_admin = self.get_main_admin()
+        return [main_admin] if main_admin else []
 
     def get_groups(self):
         return self._execute("SELECT id, name FROM GROUPS", fetch=True)
