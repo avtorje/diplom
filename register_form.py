@@ -1,37 +1,35 @@
 import tkinter as tk
 from tkinter import messagebox
 from database import Database
-
+import sqlite3
 
 class RegisterForm(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Регистрация")
         self.geometry("300x300")
-
         self.db = Database()
 
-        # UI компоненты
-        tk.Label(self, text="Имя пользователя").pack(pady=5)
-        self.username_entry = tk.Entry(self)
-        self.username_entry.pack(pady=5)
-
-        tk.Label(self, text="Пароль").pack(pady=5)
-        self.password_entry = tk.Entry(self, show="*")
-        self.password_entry.pack(pady=5)
-
-        tk.Label(self, text="Подтверждение пароля").pack(pady=5)
-        self.confirm_password_entry = tk.Entry(self, show="*")
-        self.confirm_password_entry.pack(pady=5)
+        fields = [
+            ("Имя пользователя", "username", None),
+            ("Пароль", "password", "*"),
+            ("Подтверждение пароля", "confirm", "*")
+        ]
+        self.entries = {}
+        for label, name, show in fields:
+            tk.Label(self, text=label).pack(pady=5)
+            entry = tk.Entry(self, show=show) if show else tk.Entry(self)
+            entry.pack(pady=5)
+            self.entries[name] = entry
 
         tk.Button(self, text="Зарегистрироваться", command=self.register).pack(pady=5)
 
     def register(self):
-        username = self.username_entry.get()
-        password = self.password_entry.get()
-        confirm_password = self.confirm_password_entry.get()
+        username = self.entries["username"].get()
+        password = self.entries["password"].get()
+        confirm = self.entries["confirm"].get()
 
-        if password != confirm_password:
+        if password != confirm:
             messagebox.showerror("Ошибка", "Пароли не совпадают.")
             return
 

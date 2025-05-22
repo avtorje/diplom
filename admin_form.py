@@ -1,10 +1,9 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 from manage_tests_form import ManageTestsForm
 from manage_users_form import ManageUsersForm
 from statistics_form import StatisticsForm
 from database import Database
-
 
 class AdminForm(tk.Tk):
     def __init__(self, admin_id):
@@ -18,65 +17,48 @@ class AdminForm(tk.Tk):
 
     def create_widgets(self):
         tk.Label(self, text="Панель администратора", font=("Arial", 16)).pack(pady=10)
+        buttons = [
+            ("Управление тестами", self.open_form, ManageTestsForm),
+            ("Управление пользователями", self.open_form, ManageUsersForm),
+            ("Просмотр статистики", self.open_form, StatisticsForm),
+            ("Изменить пароль", self.change_password, None),
+            ("Назад", self.go_back, None),
+            ("Выход", self.exit_app, None)
+        ]
+        for text, cmd, arg in buttons:
+            tk.Button(self, text=text, command=(lambda c=cmd, a=arg: c(a) if a else c())).pack(pady=5)
 
-        tk.Button(self, text="Управление тестами", command=self.open_manage_tests).pack(pady=5)
-        tk.Button(self, text="Управление пользователями", command=self.open_manage_users).pack(pady=5)
-        tk.Button(self, text="Просмотр статистики", command=self.open_statistics).pack(pady=5)
-        tk.Button(self, text="Изменить пароль", command=self.change_password).pack(pady=5)
-        tk.Button(self, text="Назад", command=self.go_back).pack(pady=5)
-        tk.Button(self, text="Выход", command=self.exit_app).pack(pady=5)
-
-    def change_password(self):
-        from tkinter import messagebox, simpledialog
-
-        old_password = simpledialog.askstring("Старый пароль", "Введите старый пароль:", show='*', parent=self)
-        if not old_password:
+    def change_password(self, _=None):
+        old = simpledialog.askstring("Старый пароль", "Введите старый пароль:", show='*', parent=self)
+        if not old or not self.db.check_admin_password(self.admin_id, old):
+            if old: messagebox.showerror("Ошибка", "Старый пароль неверный.", parent=self)
             return
-
-        if not self.db.check_admin_password(self.admin_id, old_password):
-            messagebox.showerror("Ошибка", "Старый пароль неверный.", parent=self)
-            return
-
-        new_password = simpledialog.askstring("Новый пароль", "Введите новый пароль:", show='*', parent=self)
-        if not new_password:
-            return
-        confirm_password = simpledialog.askstring("Подтверждение", "Повторите новый пароль:", show='*', parent=self)
-        if new_password != confirm_password:
+        new = simpledialog.askstring("Новый пароль", "Введите новый пароль:", show='*', parent=self)
+        if not new: return
+        confirm = simpledialog.askstring("Подтверждение", "Повторите новый пароль:", show='*', parent=self)
+        if new != confirm:
             messagebox.showerror("Ошибка", "Пароли не совпадают.", parent=self)
             return
-
-        self.db.update_admin_password(self.admin_id, new_password)
+        self.db.update_admin_password(self.admin_id, new)
         messagebox.showinfo("Успешно", "Пароль успешно изменён!", parent=self)
 
-    def open_manage_tests(self):
-        self.withdraw()  # Скрыть текущее окно
-        ManageTestsForm(self).mainloop()
+    def open_form(self, form_class):
+        self.withdraw()
+        form_class(self).mainloop()
 
-    def open_manage_users(self):
-        self.withdraw()  # Скрыть текущее окно
-        ManageUsersForm(self).mainloop()
-
-    def open_statistics(self):
-        self.withdraw()  # Скрыть текущее окно
-        StatisticsForm(self).mainloop()
-
-    def go_back(self):
+    def go_back(self, _=None):
         if messagebox.askyesno("Вернуться", "Вы уверены, что хотите вернуться в меню регистрации?"):
             self.destroy()
             from login_form import LoginForm
             LoginForm().mainloop()
 
-    def exit_app(self):
+    def exit_app(self, _=None):
         if messagebox.askyesno("Выход", "Вы уверены, что хотите выйти?"):
             self.destroy()
 
     def center_window(self):
-        """Центрирует окно на экране."""
         self.update_idletasks()
-        width = self.winfo_width()
-        height = self.winfo_height()
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        x = (screen_width // 2) - (width // 2)
-        y = (screen_height // 2) - (height // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        w, h = self.winfo_width(), self.winfo_height()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        x, y = (sw - w) // 2, (sh - h) // 2
+        self.geometry(f"{w}x{h}+{x}+{y}")

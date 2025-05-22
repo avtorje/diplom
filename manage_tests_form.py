@@ -18,12 +18,13 @@ class ManageTestsForm(tk.Toplevel):
         tk.Label(self, text="Управление тестами", font=("Arial", 16)).pack(pady=10)
         self.tests_listbox = tk.Listbox(self)
         self.tests_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
-        for text, cmd in [
+        buttons = [
             ("Добавить тест", self.add_test),
-            ("Редактировать тест", self.edit_test),
+            ("Редактировать тест", lambda: self.modify_test(EditTestForm)),
             ("Удалить тест", self.delete_test),
             ("Назад", self.go_back)
-        ]:
+        ]
+        for text, cmd in buttons:
             tk.Button(self, text=text, command=cmd).pack(pady=5)
 
     def load_tests(self):
@@ -46,13 +47,13 @@ class ManageTestsForm(tk.Toplevel):
             except ValueError as e:
                 messagebox.showerror("Ошибка", str(e))
 
-    def edit_test(self):
+    def modify_test(self, form_class):
         test_id = self.get_selected_test_id()
         if not test_id:
             messagebox.showerror("Ошибка", "Выберите тест для редактирования.")
             return
         self.withdraw()
-        EditTestForm(self, test_id).mainloop()
+        form_class(self, test_id).mainloop()
 
     def delete_test(self):
         test_id = self.get_selected_test_id()

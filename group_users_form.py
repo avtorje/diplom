@@ -10,70 +10,66 @@ class GroupUsersForm(tk.Toplevel):
         self.group_id = group_id
         self.title(f"Пользователи группы {self.get_group_name()}")
         self.geometry("350x400")
-        self.create_widgets()
-        self.load_group_users()
+        self._create_widgets()
+        self._load_group_users()
 
     def get_group_name(self):
         group = self.db._execute("SELECT name FROM GROUPS WHERE id=?", (self.group_id,), fetch=True)
         return group[0][0] if group else "?"
 
-    def create_widgets(self):
-        tk.Label(self, text="Администраторы группы:", font=("Arial", 12, "bold")).pack(pady=2)
-        self.admins_listbox = tk.Listbox(self)
-        self.admins_listbox.pack(fill=tk.X, pady=2)
+    def _create_widgets(self):
+        for label, attr in [("Администраторы группы:", "admins_listbox"), ("Студенты группы:", "students_listbox")]:
+            tk.Label(self, text=label, font=("Arial", 12, "bold")).pack(pady=2)
+            lb = tk.Listbox(self)
+            lb.pack(fill=tk.BOTH if "students" in attr else tk.X, expand="students" in attr, pady=2)
+            setattr(self, attr, lb)
+        for text, cmd in [
+            ("Добавить пользователя", self._add_user),
+            ("Редактировать пользователя", self._edit_user),
+            ("Удалить пользователя", self._delete_user),
+            ("Закрыть", self.destroy)
+        ]:
+            tk.Button(self, text=text, command=cmd).pack(pady=2 if text != "Закрыть" else 5)
 
-        tk.Label(self, text="Студенты группы:", font=("Arial", 12, "bold")).pack(pady=2)
-        self.students_listbox = tk.Listbox(self)
-        self.students_listbox.pack(fill=tk.BOTH, expand=True, pady=2)
+    def _load_group_users(self):
+        for lb, getter, id_attr in [
+            (self.admins_listbox, self.db.get_admins_by_group, "admin_ids"),
+            (self.students_listbox, self.db.get_students_by_group, "student_ids")
+        ]:
+            lb.delete(0, tk.END)
+            users = getter(self.group_id)
+            ids = []
+            for idx, user in enumerate(users, 1):
+                lb.insert(tk.END, f"{idx}. {user[1]}")
+                ids.append(user[0])
+            setattr(self, id_attr, ids)
 
-        tk.Button(self, text="Добавить пользователя", command=self.add_user).pack(pady=5)
-        tk.Button(self, text="Редактировать пользователя", command=self.edit_user).pack(pady=2)
-        tk.Button(self, text="Удалить пользователя", command=self.delete_user).pack(pady=2)
-        tk.Button(self, text="Закрыть", command=self.destroy).pack(pady=5)
+    def _get_selected_user_id(self):
+        for lb, ids in [(self.admins_listbox, self.admin_ids), (self.students_listbox, self.student_ids)]:
+            idx = lb.curselection()
+            if idx:
+                return ids[idx[0]]
+        return None
 
-    def load_group_users(self):
-        self.admins_listbox.delete(0, tk.END)
-        self.students_listbox.delete(0, tk.END)
-        admins = self.db.get_admins_by_group(self.group_id)
-        self.admin_ids = []
-        for idx, admin in enumerate(admins, start=1):
-            self.admins_listbox.insert(tk.END, f"{idx}. {admin[1]}")
-            self.admin_ids.append(admin[0])
-        students = self.db.get_students_by_group(self.group_id)
-        self.student_ids = []
-        for idx, student in enumerate(students, start=1):
-            self.students_listbox.insert(tk.END, f"{idx}. {student[1]}")
-            self.student_ids.append(student[0])
-
-    def add_user(self):
+    def _add_user(self):
         UserForm(self, "Добавить пользователя", group_id=self.group_id)
         self.wait_window()
-        self.load_group_users()
+        self._load_group_users()
 
-    def edit_user(self):
-        idx = self.admins_listbox.curselection()
-        if idx:
-            user_id = self.admin_ids[idx[0]]
-        else:
-            idx = self.students_listbox.curselection()
-            if not idx:
-                messagebox.showerror("Ошибка", "Выберите пользователя для редактирования.")
-                return
-            user_id = self.student_ids[idx[0]]
+    def _edit_user(self):
+        user_id = self._get_selected_user_id()
+        if not user_id:
+            messagebox.showerror("Ошибка", "Выберите пользователя для редактирования.")
+            return
         UserForm(self, "Редактировать пользователя", user_id=user_id)
         self.wait_window()
-        self.load_group_users()
+        self._load_group_users()
 
-    def delete_user(self):
-        idx = self.admins_listbox.curselection()
-        if idx:
-            user_id = self.admin_ids[idx[0]]
-        else:
-            idx = self.students_listbox.curselection()
-            if not idx:
-                messagebox.showerror("Ошибка", "Выберите пользователя для удаления.")
-                return
-            user_id = self.student_ids[idx[0]]
+    def _delete_user(self):
+        user_id = self._get_selected_user_id()
+        if not user_id:
+            messagebox.showerror("Ошибка", "Выберите пользователя для удаления.")
+            return
         if messagebox.askyesno("Удалить пользователя", "Вы уверены, что хотите удалить этого пользователя?"):
             self.db.delete_user(user_id)
-            self.load_group_users()
+            self._load_group_users()

@@ -1,19 +1,16 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 from database import Database
-import sqlite3
-import time
 
 class EditTestForm(tk.Toplevel):
     def __init__(self, parent, test_id):
         super().__init__(parent)
         self.db = Database()
         self.test_id = test_id
+        self.parent = parent
         self.title("Редактирование теста")
         self.geometry("500x400")
         self.center_window()
-        self.parent = parent
-
         self.questions = self.db.get_questions(test_id)
         self.create_widgets()
         self.load_questions()
@@ -22,246 +19,155 @@ class EditTestForm(tk.Toplevel):
         tk.Label(self, text="Редактирование теста", font=("Arial", 16)).pack(pady=10)
         self.questions_listbox = tk.Listbox(self)
         self.questions_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
-        tk.Button(self, text="Добавить вопрос", command=self.add_question).pack(pady=5)
-        tk.Button(self, text="Просмотреть вопрос", command=self.view_question).pack(pady=5)
-        tk.Button(self, text="Редактировать вопрос", command=self.edit_question).pack(pady=5)
-        tk.Button(self, text="Удалить вопрос", command=self.delete_question).pack(pady=5)
-        tk.Button(self, text="Назад", command=self.go_back).pack(pady=5)
+        actions = [
+            ("Добавить вопрос", self.add_question),
+            ("Просмотреть вопрос", self.view_question),
+            ("Редактировать вопрос", self.edit_question),
+            ("Удалить вопрос", self.delete_question),
+            ("Назад", self.go_back)
+        ]
+        for text, cmd in actions:
+            tk.Button(self, text=text, command=cmd).pack(pady=5)
 
     def load_questions(self):
+        self.questions = self.db.get_questions(self.test_id)
         self.questions_listbox.delete(0, tk.END)
-        for question in self.questions:
-            self.questions_listbox.insert(tk.END, f"{question['theme_local_number']}: {question['text']}")
+        for q in self.questions:
+            self.questions_listbox.insert(tk.END, f"{q['theme_local_number']}: {q['text']}")
 
     def ask_question_data(self, default_text="", default_options=None, default_correct=None):
-        question_text = self.open_input_dialog("Вопрос", "Введите текст вопроса:", default_text)
-        if not question_text:
-            return None
+        q_text = self.open_input_dialog("Вопрос", "Введите текст вопроса:", default_text)
+        if not q_text: return None
 
-        total_answers = self.open_input_dialog(
+        total = self.open_input_dialog(
             "Количество ответов", "Введите общее количество ответов (2-10):",
             str(len(default_options) if default_options else 2)
         )
-        if not total_answers or not total_answers.isdigit() or not (2 <= int(total_answers) <= 10):
+        if not (total and total.isdigit() and 2 <= int(total) <= 10):
             messagebox.showerror("Ошибка", "Количество ответов должно быть числом от 2 до 10.", parent=self)
             return None
-        total_answers = int(total_answers)
+        total = int(total)
 
         options = []
-        for i in range(total_answers):
+        for i in range(total):
             default = default_options[i] if default_options and i < len(default_options) else ""
-            option = self.open_input_dialog(
-                "Вариант ответа", f"Введите текст варианта ответа {i + 1}:", default
-            )
-            if not option or not option.strip():
-                messagebox.showerror("Ошибка", f"Вариант ответа {i + 1} не может быть пустым.", parent=self)
+            opt = self.open_input_dialog("Вариант ответа", f"Введите текст варианта ответа {i+1}:", default)
+            if not (opt and opt.strip()):
+                messagebox.showerror("Ошибка", f"Вариант ответа {i+1} не может быть пустым.", parent=self)
                 return None
-            options.append(option.strip())
+            options.append(opt.strip())
 
-        correct_def = ", ".join(str(idx + 1) for idx in default_correct) if default_correct else ""
-        correct_answers = self.open_input_dialog(
-            "Правильные ответы",
-            f"Введите номера правильных ответов через запятую (1-{total_answers}):",
-            correct_def
+        correct_def = ", ".join(str(idx+1) for idx in (default_correct or []))
+        correct = self.open_input_dialog(
+            "Правильные ответы", f"Введите номера правильных ответов через запятую (1-{total}):", correct_def
         )
-        if not correct_answers:
+        if not correct:
             messagebox.showerror("Ошибка", "Необходимо указать хотя бы один правильный ответ.", parent=self)
             return None
         try:
-            indices = [int(x.strip()) - 1 for x in correct_answers.split(",") if x.strip()]
-            if not indices or not all(0 <= idx < total_answers for idx in indices):
+            indices = [int(x.strip())-1 for x in correct.split(",") if x.strip()]
+            if not indices or not all(0 <= idx < total for idx in indices):
                 raise ValueError
         except ValueError:
             messagebox.showerror("Ошибка", "Некорректные номера правильных ответов.", parent=self)
             return None
-
-        return question_text, options, list(set(indices))
+        return q_text, options, list(set(indices))
 
     def add_question(self):
         try:
-            question_text = self.open_input_dialog("Добавить вопрос", "Введите текст нового вопроса:")
-            if not question_text:
+            data = self.ask_question_data()
+            if not data: return
+            q_text, options, correct = data
+            if any(q['text'].strip().lower() == q_text.strip().lower() for q in self.questions):
+                messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
                 return
-
-            # --- Проверка на уникальность текста вопроса ---
-            for q in self.questions:
-                if q['text'].strip().lower() == question_text.strip().lower():
-                    messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
-                    return
-
-            total_answers = self.open_input_dialog(
-                "Количество ответов", "Введите общее количество ответов (2-10):"
-            )
-            if not total_answers or not total_answers.isdigit() or not (2 <= int(total_answers) <= 10):
-                messagebox.showerror("Ошибка", "Количество ответов должно быть числом от 2 до 10.", parent=self)
-                return
-            total_answers = int(total_answers)
-
-            options = []
-            for i in range(total_answers):
-                option = self.open_input_dialog(
-                    "Добавить вариант ответа", f"Введите текст варианта ответа {i + 1}:"
-                )
-                if option and option.strip():
-                    options.append(option.strip())
-                else:
-                    messagebox.showerror("Ошибка", f"Вариант ответа {i + 1} не может быть пустым.", parent=self)
-                    return
-
-            correct_answers = self.open_input_dialog(
-                "Правильные ответы",
-                f"Введите номера правильных ответов через запятую (1-{total_answers}):"
-            )
-            if not correct_answers:
-                messagebox.showerror("Ошибка", "Необходимо указать хотя бы один правильный ответ.", parent=self)
-                return
-
-            try:
-                parts = [x.strip() for x in correct_answers.split(",")]
-                if "" in parts:
-                    raise ValueError("Обнаружены пустые значения.")
-
-                correct_answers = list(set(int(x) - 1 for x in parts))
-            except ValueError:
-                messagebox.showerror("Ошибка", "Номера правильных ответов должны быть целыми числами без пропусков.", parent=self)
-                return
-
-            if not correct_answers or not all(0 <= x < total_answers for x in correct_answers):
-                messagebox.showerror(
-                    "Ошибка", f"Номера правильных ответов должны быть в диапазоне от 1 до {total_answers}.", parent=self
-                )
-                return
-
-            self.db.add_question(self.test_id, question_text, options, correct_answers)
-            self.questions = self.db.get_questions(self.test_id)
+            self.db.add_question(self.test_id, q_text, options, correct)
             self.load_questions()
-            messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{question_text}", parent=self)
+            messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
         except Exception as e:
             messagebox.showerror("Ошибка", str(e), parent=self)
 
     def view_question(self):
-        selected_index = self.questions_listbox.curselection()
-        if not selected_index:
-            messagebox.showerror("Ошибка", "Выберите вопрос для просмотра.", parent=self)
-            return
-        question = self.questions[selected_index[0]]
-        question_text = question['text']
-        options = question['options']
-        correct_answers = question.get('correct_option', [])
-
-        question_window = tk.Toplevel(self)
-        question_window.title("Просмотр вопроса")
-        self.center_window(question_window)
-        question_window.geometry("400x400")
-
-        canvas = tk.Canvas(question_window, borderwidth=0, background="#f0f0f0")
+        idx = self.get_selected_index("просмотра")
+        if idx is None: return
+        q = self.questions[idx]
+        win = tk.Toplevel(self)
+        win.title("Просмотр вопроса")
+        self.center_window(win)
+        win.geometry("400x400")
+        canvas = tk.Canvas(win, borderwidth=0, background="#f0f0f0")
         frame = tk.Frame(canvas, background="#f0f0f0")
-        vscrollbar = tk.Scrollbar(question_window, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=vscrollbar.set)
-        vscrollbar.pack(side="right", fill="y")
+        vscroll = tk.Scrollbar(win, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vscroll.set)
+        vscroll.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
         canvas.create_window((20, 0), window=frame, anchor="nw")
+        frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
-        def on_frame_configure(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        frame.bind("<Configure>", on_frame_configure)
-
-        question_label = tk.Label(
-            frame, text=question_text, font=("Arial", 14),
-            background="#f0f0f0", anchor="center", justify="center"
-        )
-        question_label.pack(pady=10, fill="x")
-
-        answer_labels = []
+        q_lbl = tk.Label(frame, text=q['text'], font=("Arial", 14), background="#f0f0f0", anchor="center", justify="center")
+        q_lbl.pack(pady=10, fill="x")
         tk.Label(frame, text="Варианты ответов:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
-        for i, option in enumerate(options):
-            lbl = tk.Label(
-                frame, text=f"{i+1}. {option}", font=("Arial", 12),
-                background="#f0f0f0", anchor="w", justify="left"
-            )
-            lbl.pack(pady=5, anchor="w", fill="x")
-            answer_labels.append(lbl)
-
+        ans_lbls = [tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left")
+                    for i, opt in enumerate(q['options'])]
+        for lbl in ans_lbls: lbl.pack(pady=5, anchor="w", fill="x")
         tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
-        correct_labels = []
-        for correct_answer in correct_answers:
-            lbl = tk.Label(
-                frame, text=f"{correct_answer+1}. {options[correct_answer]}", font=("Arial", 12),
-                fg="green", background="#f0f0f0", anchor="w", justify="left"
-            )
-            lbl.pack(pady=5, anchor="w", fill="x")
-            correct_labels.append(lbl)
-
-        def update_wraplength(event):
-            w = event.width - 40
-            w = max(w, 100)
-            question_label.config(wraplength=w)
-            for lbl in answer_labels + correct_labels:
-                lbl.config(wraplength=w)
-
-        canvas.bind("<Configure>", update_wraplength)
-        question_window.update_idletasks()
-        initial_width = max(canvas.winfo_width() - 40, 100)
-        question_label.config(wraplength=initial_width)
-        for lbl in answer_labels + correct_labels:
-            lbl.config(wraplength=initial_width)
-
-    def open_input_dialog(self, title, prompt, default=""):
-        return simpledialog.askstring(title, prompt, initialvalue=default, parent=self)
+        corr_lbls = [tk.Label(frame, text=f"{i+1}. {q['options'][i]}", font=("Arial", 12), fg="green", background="#f0f0f0", anchor="w", justify="left")
+                     for i in q.get('correct_option',[])]
+        for lbl in corr_lbls: lbl.pack(pady=5, anchor="w", fill="x")
+        def update_wrap(event):
+            w = max(event.width-40, 100)
+            q_lbl.config(wraplength=w)
+            for lbl in ans_lbls + corr_lbls: lbl.config(wraplength=w)
+        canvas.bind("<Configure>", update_wrap)
+        win.update_idletasks()
+        initial_w = max(canvas.winfo_width()-40, 100)
+        q_lbl.config(wraplength=initial_w)
+        for lbl in ans_lbls + corr_lbls: lbl.config(wraplength=initial_w)
 
     def edit_question(self):
-        selected_index = self.questions_listbox.curselection()
-        if not selected_index:
-            messagebox.showerror("Ошибка", "Выберите вопрос для редактирования.", parent=self)
-            return
-        question = self.questions[selected_index[0]]
-        data = self.ask_question_data(
-            default_text=question["text"],
-            default_options=question["options"],
-            default_correct=question.get("correct_option", [])
-        )
-        if not data:
-            return
-        new_question_text, new_options, correct_indices = data
-        self.db.update_question(question["id"], new_question_text, new_options, correct_indices)
-        self.questions = self.db.get_questions(self.test_id)
+        idx = self.get_selected_index("редактирования")
+        if idx is None: return
+        q = self.questions[idx]
+        data = self.ask_question_data(q["text"], q["options"], q.get("correct_option", []))
+        if not data: return
+        q_text, options, correct = data
+        self.db.update_question(q["id"], q_text, options, correct)
         self.load_questions()
         messagebox.showinfo("Успешно", "Вопрос успешно обновлён.", parent=self)
 
     def delete_question(self):
-        selected_indices = self.questions_listbox.curselection()
-        if not selected_indices:
-            messagebox.showerror("Ошибка", "Выберите вопрос для удаления.", parent=self)
-            return
-        selected_index = selected_indices[0]
-        question = self.questions[selected_index]
-        question_id = question["id"]
-
-        if messagebox.askyesno("Удаление вопроса", f"Вы уверены, что хотите удалить вопрос №{question['theme_local_number']}?", parent=self):
-            self.db.delete_question(question_id)
-            self.questions = self.db.get_questions(self.test_id)
+        idx = self.get_selected_index("удаления")
+        if idx is None: return
+        q = self.questions[idx]
+        if messagebox.askyesno("Удаление вопроса", f"Вы уверены, что хотите удалить вопрос №{q['theme_local_number']}?", parent=self):
+            self.db.delete_question(q["id"])
             self.renumber_questions()
-            self.questions = self.db.get_questions(self.test_id)
             self.load_questions()
-            messagebox.showinfo("Вопрос удалён", f"Вопрос успешно удалён.", parent=self)
+            messagebox.showinfo("Вопрос удалён", "Вопрос успешно удалён.", parent=self)
 
     def renumber_questions(self):
-        """Переустанавливает порядковые номера вопросов в тесте после удаления."""
-        for idx, question in enumerate(self.questions):
-            if question['theme_local_number'] != idx + 1:
-                self.db.update_theme_local_number(question['id'], idx + 1)
+        for idx, q in enumerate(self.db.get_questions(self.test_id)):
+            if q['theme_local_number'] != idx+1:
+                self.db.update_theme_local_number(q['id'], idx+1)
 
     def go_back(self):
         self.destroy()
-        if self.parent is not None:
-            self.parent.deiconify()
+        if self.parent: self.parent.deiconify()
 
     def center_window(self, window=None):
-        if window is None:
-            window = self
+        window = window or self
         window.update_idletasks()
-        width = window.winfo_width()
-        height = window.winfo_height()
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
+        w, h = window.winfo_width(), window.winfo_height()
+        x = (self.winfo_screenwidth() // 2) - (w // 2)
+        y = (self.winfo_screenheight() // 2) - (h // 2)
         window.geometry(f"+{x}+{y}")
+
+    def open_input_dialog(self, title, prompt, default=""):
+        return simpledialog.askstring(title, prompt, initialvalue=default, parent=self)
+
+    def get_selected_index(self, action):
+        idxs = self.questions_listbox.curselection()
+        if not idxs:
+            messagebox.showerror("Ошибка", f"Выберите вопрос для {action}.", parent=self)
+            return None
+        return idxs[0]

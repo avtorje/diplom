@@ -10,7 +10,6 @@ class LoginForm(tk.Tk):
         self.title("Вход")
         self.geometry("350x320")
         self.center_window()
-
         self.db = Database()
 
         tab_control = ttk.Notebook(self)
@@ -21,34 +20,32 @@ class LoginForm(tk.Tk):
         tab_control.pack(expand=1, fill="both")
 
         # --- Админ форма ---
-        tk.Label(self.admin_tab, text="Имя пользователя").pack(pady=5)
-        self.username_entry = tk.Entry(self.admin_tab)
-        self.username_entry.pack(pady=5)
-
-        tk.Label(self.admin_tab, text="Пароль").pack(pady=5)
-        self.password_entry = tk.Entry(self.admin_tab, show="*")
-        self.password_entry.pack(pady=5)
-
+        self._create_labeled_entry(self.admin_tab, "Имя пользователя", "username_entry")
+        self._create_labeled_entry(self.admin_tab, "Пароль", "password_entry", show="*")
         tk.Button(self.admin_tab, text="Войти", command=self.login).pack(pady=5)
         tk.Button(self.admin_tab, text="Регистрация", command=self.open_register_form).pack(pady=5)
 
         # --- Студенческая форма ---
-        tk.Label(self.student_tab, text="Выберите группу").pack(pady=5)
-        self.group_combobox = ttk.Combobox(self.student_tab, state="readonly")
-        self.group_combobox.pack(pady=5)
-        self.group_combobox.bind("<<ComboboxSelected>>", self.on_group_selected)
-
-        tk.Label(self.student_tab, text="Выберите имя").pack(pady=5)
-        self.student_combobox = ttk.Combobox(self.student_tab, state="readonly")
-        self.student_combobox.pack(pady=5)
-
-        tk.Label(self.student_tab, text="Код группы").pack(pady=5)
-        self.group_code_entry = tk.Entry(self.student_tab, show="*")
-        self.group_code_entry.pack(pady=5)
-
+        self._create_labeled_combobox(self.student_tab, "Выберите группу", "group_combobox", self.on_group_selected)
+        self._create_labeled_combobox(self.student_tab, "Выберите имя", "student_combobox")
+        self._create_labeled_entry(self.student_tab, "Код группы", "group_code_entry", show="*")
         tk.Button(self.student_tab, text="Войти", command=self.student_login).pack(pady=10)
 
         self.load_groups()
+
+    def _create_labeled_entry(self, parent, label, attr, **kwargs):
+        tk.Label(parent, text=label).pack(pady=5)
+        entry = tk.Entry(parent, **kwargs)
+        entry.pack(pady=5)
+        setattr(self, attr, entry)
+
+    def _create_labeled_combobox(self, parent, label, attr, bind_func=None):
+        tk.Label(parent, text=label).pack(pady=5)
+        cb = ttk.Combobox(parent, state="readonly")
+        cb.pack(pady=5)
+        if bind_func:
+            cb.bind("<<ComboboxSelected>>", bind_func)
+        setattr(self, attr, cb)
 
     def load_groups(self):
         groups = self.db.get_groups()
@@ -57,18 +54,9 @@ class LoginForm(tk.Tk):
     def login(self):
         username = self.username_entry.get()
         password = self.password_entry.get()
-
         user = self.db.validate_user(username, password)
         if user:
-            role = user[3]
-            if role == "admin":
-                messagebox.showinfo("Успешно", "Добро пожаловать, администратор!")
-                self.destroy()
-                AdminForm(user[0]).mainloop()
-            else:
-                messagebox.showinfo("Успешно", "Добро пожаловать, студент!")
-                self.destroy()
-                StudentForm(user[0], user[1]).mainloop()
+            self._open_form(user)
         else:
             messagebox.showerror("Ошибка", "Неверное имя пользователя или пароль.")
 
@@ -76,20 +64,25 @@ class LoginForm(tk.Tk):
         group_name = self.group_combobox.get()
         student_name = self.student_combobox.get()
         group_code = self.group_code_entry.get()
-
         group = self.db.get_group_by_name(group_name)
         if not group or group['access_code'] != group_code:
             messagebox.showerror("Ошибка", "Неверный код группы!")
             return
-
         user = self.db.get_user_by_name_and_group(student_name, group['id'])
         if not user:
             messagebox.showerror("Ошибка", "Студент не найден!")
             return
+        self._open_form(user, student=True)
 
-        messagebox.showinfo("Вход выполнен", f"Добро пожаловать, {student_name}!")
-        self.destroy()
-        StudentForm(user[0], user[1]).mainloop()
+    def _open_form(self, user, student=False):
+        if not student and user[3] == "admin":
+            messagebox.showinfo("Успешно", "Добро пожаловать, администратор!")
+            self.destroy()
+            AdminForm(user[0]).mainloop()
+        else:
+            messagebox.showinfo("Вход выполнен", f"Добро пожаловать, {user[1]}!")
+            self.destroy()
+            StudentForm(user[0], user[1]).mainloop()
 
     def on_group_selected(self, event):
         group_name = self.group_combobox.get()
