@@ -43,15 +43,22 @@ class Database:
 
     def _create_tables(self):
         tables = [
-            """CREATE TABLE IF NOT EXISTS USERS (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL,
-                role TEXT NOT NULL,
-                first_name TEXT,
-                last_name TEXT,
-                middle_name TEXT
+            """CREATE TABLE IF NOT EXISTS GROUPS (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            access_code TEXT NOT NULL
             )""",
+            """CREATE TABLE IF NOT EXISTS USERS (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL,
+            first_name TEXT,
+            last_name TEXT,
+            middle_name TEXT,
+            group_id INTEGER,
+            FOREIGN KEY (group_id) REFERENCES GROUPS(id)
+         )""",
             """CREATE TABLE IF NOT EXISTS THEME (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE
@@ -91,6 +98,20 @@ class Database:
             )
         except sqlite3.IntegrityError:
             pass
+
+    def get_groups(self):
+        return self._execute("SELECT id, name FROM GROUPS", fetch=True)
+
+    def get_group_by_name(self, group_name):
+        result = self._execute("SELECT id, name, access_code FROM GROUPS WHERE name=?", (group_name,), fetch=True)
+        return {'id': result[0][0], 'name': result[0][1], 'access_code': result[0][2]} if result else None
+
+    def get_students_by_group(self, group_id):
+        return self._execute("SELECT id, username FROM USERS WHERE group_id=? AND role='student'", (group_id,), fetch=True)
+
+    def get_user_by_name_and_group(self, username, group_id):
+        result = self._execute("SELECT * FROM USERS WHERE username=? AND group_id=? AND role='student'", (username, group_id), fetch=True)
+        return result[0] if result else None
 
     @staticmethod
     def hash_password(password):

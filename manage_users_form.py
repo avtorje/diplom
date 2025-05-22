@@ -8,10 +8,10 @@ class ManageUsersForm(tk.Toplevel):
         super().__init__(parent)
         self.db = Database()
         self.title("Управление пользователями")
-        self.geometry("400x400")
+        self.geometry("600x400")
+        self.center_window()
         self.parent = parent
         self.create_widgets()
-        self.load_users()
 
     def create_widgets(self):
         tk.Label(self, text="Управление пользователями", font=("Arial", 16)).pack(pady=10)
@@ -23,6 +23,19 @@ class ManageUsersForm(tk.Toplevel):
         tk.Button(self, text="Редактировать пользователя", command=self.edit_user).pack(pady=5)
         tk.Button(self, text="Удалить пользователя", command=self.delete_user).pack(pady=5)
         tk.Button(self, text="Назад", command=self.go_back).pack(pady=5)
+    
+    def center_window(self):
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        if width == 1:  # Если размеры еще не установлены, используем geometry
+            width = 600
+            height = 400
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def load_users(self):
         self.users_listbox.delete(0, tk.END)
