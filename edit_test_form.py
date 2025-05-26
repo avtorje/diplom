@@ -82,19 +82,21 @@ class EditTestForm(tk.Toplevel):
                 messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
                 return
             self.db.add_question(self.test_id, q_text, options, correct)
-            self.load_questions()  # Обновляем self.questions и self.questions_listbox
-            # Выделяем последний добавленный вопрос
-            if self.questions:
+            self.load_questions()
+            # выделяем последний вопрос
+            last_idx = len(self.questions) - 1
+            if last_idx >= 0:
                 self.questions_listbox.selection_clear(0, tk.END)
-                self.questions_listbox.selection_set(len(self.questions) - 1)
-                self.questions_listbox.activate(len(self.questions) - 1)
+                self.questions_listbox.selection_set(last_idx)
+                self.questions_listbox.activate(last_idx)
             messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
         except Exception as e:
             messagebox.showerror("Ошибка", str(e), parent=self)
 
     def show_question(self, view_only=True):
-        idx = self.get_selected_index("просмотра" if view_only else "редактирования")
-        if idx is None: return
+        idx = self.get_selected_index("просмотра")
+        if idx is None:
+            return
         q = self.questions[idx]
         if view_only:
             self.show_question_window(q)
@@ -142,20 +144,21 @@ class EditTestForm(tk.Toplevel):
 
     def delete_question(self):
         idx = self.get_selected_index("удаления")
-        if idx is None: return
+        if idx is None:
+            return
         q = self.questions[idx]
         if messagebox.askyesno("Удаление вопроса", f"Вы уверены, что хотите удалить вопрос №{q['theme_local_number']}?", parent=self):
             self.db.delete_question(q["id"])
             self.renumber_questions()
             self.load_questions()
+            # выделить предыдущий вопрос (если есть)
+            next_idx = min(idx, len(self.questions) - 1)
+            if next_idx >= 0:
+                self.questions_listbox.selection_clear(0, tk.END)
+                self.questions_listbox.selection_set(next_idx)
+                self.questions_listbox.activate(next_idx)
             messagebox.showinfo("Вопрос удалён", "Вопрос успешно удалён.", parent=self)
-
-    def view_question(self):
-        idx = self.get_selected_index("просмотра")
-        if idx is None:
-            return
-        q = self.questions[idx]
-
+            
     def renumber_questions(self):
         for idx, q in enumerate(self.db.get_questions(self.test_id)):
             if q['theme_local_number'] != idx+1:
