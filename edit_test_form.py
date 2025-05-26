@@ -95,7 +95,7 @@ class EditTestForm(tk.Toplevel):
         if view_only:
             self.show_question_window(q)
         else:
-            data = self.ask_question_data(q["text"], q["options"], q.get("correct_option", []))
+            data = self.ask_question_data(q["text"], q["options"], q.get("correct_options", []))
             if not data: return
             q_text, options, correct = data
             self.db.update_question(q["id"], q_text, options, correct)
@@ -118,7 +118,7 @@ class EditTestForm(tk.Toplevel):
         tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
         corr_lbls = [
             tk.Label(frame, text=f"{i+1}. {q['options'][i]}", font=("Arial", 12), fg="green", background="#f0f0f0", anchor="w", justify="left")
-            for i in q.get('correct_option', []) if isinstance(i, int) and 0 <= i < len(q['options'])
+            for i in q.get('correct_options', []) if isinstance(i, int) and 0 <= i < len(q['options'])
         ]
         if corr_lbls:
             for lbl in corr_lbls: lbl.pack(pady=5, anchor="w", fill="x")

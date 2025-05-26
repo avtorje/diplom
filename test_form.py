@@ -73,7 +73,7 @@ class TestForm(tk.Toplevel):
             if not messagebox.askyesno("Incomplete Test", "You have unanswered questions. Finish anyway?"):
                 return
         score = sum(
-            ans == q["correct_option"]
+            ans == q["correct_options"]
             for ans, q in zip(self.answers, self.questions)
         )
         self.db.save_test_results(self.user_id, self.theme_id, self.questions, self.answers, score)

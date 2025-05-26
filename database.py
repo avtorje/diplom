@@ -52,7 +52,7 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 theme_id INTEGER,
                 text TEXT NOT NULL,
-                correct_option TEXT NOT NULL,
+                correct_options TEXT NOT NULL,
                 theme_local_number INTEGER,
                 FOREIGN KEY (theme_id) REFERENCES THEME(id)
             )""",
@@ -213,7 +213,7 @@ class Database:
 
     def get_questions(self, theme_id):
         query = """
-            SELECT q.id, q.theme_local_number, q.text, q.correct_option, GROUP_CONCAT(a.text, '|||')
+            SELECT q.id, q.theme_local_number, q.text, q.correct_options, GROUP_CONCAT(a.text, '|||')
             FROM QUESTION q
             LEFT JOIN ANSWER a ON q.id = a.question_id
             WHERE q.theme_id = ?
@@ -227,7 +227,7 @@ class Database:
                 "id": row[0],
                 "theme_local_number": row[1],
                 "text": row[2],
-                "correct_option": list(map(int, row[3].split(","))),
+                "correct_options": list(map(int, row[3].split(","))),
                 "options": options
             })
         return questions
@@ -238,7 +238,7 @@ class Database:
             (theme_id,), fetch=True
         )[0][0]
         self._execute(
-            "INSERT INTO QUESTION (theme_id, text, correct_option, theme_local_number) VALUES (?, ?, ?, ?)",
+            "INSERT INTO QUESTION (theme_id, text, correct_options, theme_local_number) VALUES (?, ?, ?, ?)",
             (theme_id, text, ",".join(map(str, correct_options)), theme_local_number)
         )
         question_id = self._execute("SELECT last_insert_rowid()", fetch=True)[0][0]
@@ -250,7 +250,7 @@ class Database:
 
     def update_question(self, question_id, text, options, correct_options):
         self._execute(
-            "UPDATE QUESTION SET text = ?, correct_option = ? WHERE id = ?",
+            "UPDATE QUESTION SET text = ?, correct_options = ? WHERE id = ?",
             (text, ",".join(map(str, correct_options)), question_id)
         )
         self._execute("DELETE FROM ANSWER WHERE question_id = ?", (question_id,))
