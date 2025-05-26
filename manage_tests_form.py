@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 from database import Database
 from edit_test_form import EditTestForm
+from group_select_dialog import GroupSelectDialog
 
 class ManageTestsForm(tk.Toplevel):
     def __init__(self, parent):
@@ -39,13 +40,33 @@ class ManageTestsForm(tk.Toplevel):
 
     def add_test(self):
         test_name = simpledialog.askstring("Добавить тест", "Введите название нового теста:")
-        if test_name:
-            try:
-                self.db.add_test(test_name)
-                self.load_tests()
-                messagebox.showinfo("Успешно", f"Тест '{test_name}' успешно добавлен.")
-            except ValueError as e:
-                messagebox.showerror("Ошибка", str(e))
+        if not test_name:
+            return
+
+        groups = self.db.get_groups()
+        if not groups:
+            messagebox.showerror("Ошибка", "Нет доступных групп.")
+            return
+
+        dlg = GroupSelectDialog(self, groups)
+        self.wait_window(dlg)
+        if not dlg.selected:
+            messagebox.showwarning("Внимание", "Не выбраны группы. Тест не будет создан.")
+            return
+
+        group_ids = [groups[i][0] for i in dlg.selected]
+
+        try:
+            test_id = self.db.add_test(test_name)
+            self.db.add_test_groups(test_id, group_ids)
+            self.load_tests()
+            messagebox.showinfo("Успешно", f"Тест '{test_name}' успешно добавлен для выбранных групп.")
+
+            # Открыть окно редактирования теста (добавления вопросов)
+            self.withdraw()  # скрыть главное окно, если нужно
+            EditTestForm(self, test_id).mainloop()
+        except ValueError as e:
+            messagebox.showerror("Ошибка", str(e))
 
     def modify_test(self, form_class):
         test_id = self.get_selected_test_id()

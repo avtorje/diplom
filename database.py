@@ -43,6 +43,12 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE
             )""",
+            """CREATE TABLE IF NOT EXISTS THEME_GROUP (
+                theme_id INTEGER,
+                group_id INTEGER,
+                FOREIGN KEY(theme_id) REFERENCES THEME(id),
+                FOREIGN KEY(group_id) REFERENCES GROUPS(id)
+            )""",
             """CREATE TABLE IF NOT EXISTS QUESTION (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 theme_id INTEGER,
@@ -208,14 +214,25 @@ class Database:
         return result[0] if result else None
 
     # --- Тесты и вопросы ---
-    def get_all_tests(self):
-        return self._execute("SELECT id, name FROM THEME", fetch=True)
+    def get_all_tests(self, group_id=None):
+        if group_id is None:
+            return self._execute("SELECT id, name FROM THEME", fetch=True)
+        else:
+            return self._execute(
+                "SELECT t.id, t.name FROM THEME t "
+                "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
+            )
 
     def add_test(self, test_name):
         try:
             self._execute("INSERT INTO THEME (name) VALUES (?)", (test_name,))
+            return self._execute("SELECT id FROM THEME WHERE name = ?", (test_name,), fetch=True)[0][0]
         except sqlite3.IntegrityError:
             raise ValueError("Тест с таким названием уже существует.")
+
+    def add_test_groups(self, test_id, group_ids):
+        for gid in group_ids:
+            self._execute("INSERT INTO THEME_GROUP (theme_id, group_id) VALUES (?, ?)", (test_id, gid))
 
     def delete_test(self, test_id):
         question_ids = self._execute("SELECT id FROM QUESTION WHERE theme_id = ?", (test_id,), fetch=True)

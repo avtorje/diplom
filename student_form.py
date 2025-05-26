@@ -27,7 +27,8 @@ class StudentForm(tk.Toplevel):
         self.load_themes()
 
     def load_themes(self):
-        themes = self.db.get_all_tests()
+        group_id = self.db.get_user_group_id(self.user_id)  # реализовать этот метод
+        themes = self.db.get_all_tests(group_id=group_id)
         menu = self.theme_dropdown["menu"]
         menu.delete(0, "end")
         if themes:
