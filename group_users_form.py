@@ -81,8 +81,8 @@ class GroupUsersForm(tk.Toplevel):
         if not user_id:
             messagebox.showerror("Ошибка", "Выберите пользователя для редактирования.")
             return
-        UserForm(self, "Редактировать пользователя", user_id=user_id)
-        self.wait_window()
+        form = UserForm(self, "Редактировать пользователя", user_id=user_id)
+        self.wait_window(form)
         self._load_group_users()
 
     def _delete_user(self):

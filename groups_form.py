@@ -8,10 +8,18 @@ class GroupsForm(tk.Toplevel):
         super().__init__(parent)
         self.db = Database()
         self.title("Управление группами")
-        self.geometry("400x400")
+        self.center_window(400, 400)
         self.parent = parent
         self.create_widgets()
         self.load_groups()
+
+    def center_window(self, width=400, height=400):
+        self.update_idletasks()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def create_widgets(self):
         tk.Label(self, text="Список групп", font=("Arial", 14)).pack(pady=10)
