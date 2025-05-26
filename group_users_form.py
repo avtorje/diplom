@@ -9,7 +9,7 @@ class GroupUsersForm(tk.Toplevel):
         self.db = Database()
         self.group_id = group_id
         self.title(f"Пользователи группы {self.get_group_name()}")
-        self.geometry("350x400")
+        self.geometry("350x600")
         self._create_widgets()
         self._load_group_users()
 

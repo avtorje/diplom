@@ -27,8 +27,8 @@ class ManageUsersForm(tk.Toplevel):
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=5)
-        tk.Button(btn_frame, text="Управление группами", command=lambda: GroupsForm(self)).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Назад", command=self.go_back).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Управление группами", command=self.open_groups_form).pack(pady=5, fill=tk.X)
+        tk.Button(btn_frame, text="Назад", command=self.go_back).pack(pady=5, fill=tk.X)
 
     def load_users(self):
         self.main_admin_listbox.delete(0, tk.END)
@@ -49,6 +49,10 @@ class ManageUsersForm(tk.Toplevel):
         if selection:
             group_id = self.groups[selection[0]][0]
             GroupUsersForm(self, group_id)
+
+    def open_groups_form(self):
+        from groups_form import GroupsForm
+        GroupsForm(self)
 
     def go_back(self):
         self.destroy()

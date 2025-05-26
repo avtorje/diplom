@@ -114,6 +114,24 @@ class Database:
                 query += " AND id != ?"
                 params.append(main_admin[0])
         return self._execute(query, tuple(params), fetch=True)
+    
+    def get_admins_by_group(self, group_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, username, role FROM USERS WHERE role='admin' AND username != 'admin' AND group_id = ?",
+                (group_id,)
+            )
+            return cursor.fetchall()
+
+    def get_students_by_group(self, group_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, username, role FROM USERS WHERE role='student' AND group_id = ?",
+                (group_id,)
+            )
+            return cursor.fetchall()
 
     def get_main_admin(self):
         result = self._execute("SELECT id, username, role FROM USERS WHERE role='admin' AND username='admin'", fetch=True)
