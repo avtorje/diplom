@@ -82,7 +82,12 @@ class EditTestForm(tk.Toplevel):
                 messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
                 return
             self.db.add_question(self.test_id, q_text, options, correct)
-            self.load_questions()  # <-- ДОБАВИТЬ ЭТУ СТРОКУ
+            self.load_questions()
+            # --- ВЫДЕЛИТЬ добавленный вопрос (последний в списке)
+            if self.questions:
+                self.questions_listbox.selection_clear(0, tk.END)
+                self.questions_listbox.selection_set(len(self.questions)-1)
+                self.questions_listbox.activate(len(self.questions)-1)
             messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
         except Exception as e:
             messagebox.showerror("Ошибка", str(e), parent=self)
@@ -90,10 +95,6 @@ class EditTestForm(tk.Toplevel):
     def view_question(self):
         idx = self.get_selected_index("просмотра")
         if idx is None:
-            return
-        self.load_questions()
-        if idx < 0 or idx >= len(self.questions):
-            messagebox.showerror("Ошибка", "Некорректный выбор вопроса.", parent=self)
             return
         q = self.questions[idx]
         win = tk.Toplevel(self)
@@ -120,7 +121,7 @@ class EditTestForm(tk.Toplevel):
                 tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left").pack(pady=5, anchor="w", fill="x")
         else:
             tk.Label(frame, text="Нет вариантов ответа", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
-            
+
         # Правильные ответы
         tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
         corr_lbls = [
@@ -132,7 +133,7 @@ class EditTestForm(tk.Toplevel):
             for lbl in corr_lbls: lbl.pack(pady=5, anchor="w", fill="x")
         else:
             tk.Label(frame, text="Нет правильных ответов", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
-
+            
     def edit_question(self):
         idx = self.get_selected_index("редактирования")
         if idx is None: return
