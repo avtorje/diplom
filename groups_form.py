@@ -25,7 +25,6 @@ class GroupsForm(tk.Toplevel):
         tk.Label(self, text="Список групп", font=("Arial", 14)).pack(pady=10)
         self.groups_listbox = tk.Listbox(self)
         self.groups_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
-        self.groups_listbox.bind("<<ListboxSelect>>", self.open_group_users)
         btns = [
             ("Добавить группу", self.add_or_edit_group),
             ("Редактировать группу", lambda: self.add_or_edit_group(edit=True)),
@@ -38,19 +37,14 @@ class GroupsForm(tk.Toplevel):
     def load_groups(self):
         self.groups_listbox.delete(0, tk.END)
         self.groups = self.db.get_groups()
-        for group in self.groups:
-            self.groups_listbox.insert(tk.END, f"{group[0]}: {group[1]}")
+        for i, group in enumerate(self.groups, 1):  # Корректная нумерация
+            self.groups_listbox.insert(tk.END, f"{i}. {group[1]}")
 
     def get_selected_group_id(self):
         idx = self.groups_listbox.curselection()
         if not idx:
             return None
         return self.groups[idx[0]][0]
-
-    def open_group_users(self, event):
-        group_id = self.get_selected_group_id()
-        if group_id:
-            GroupUsersForm(self, group_id)
 
     def add_or_edit_group(self, edit=False):
         group_id = self.get_selected_group_id() if edit else None

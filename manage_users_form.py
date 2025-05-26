@@ -29,7 +29,7 @@ class ManageUsersForm(tk.Toplevel):
         tk.Label(self, text="Управление по группам", font=("Arial", 14)).pack(pady=5)
         self.groups_listbox = tk.Listbox(self)
         self.groups_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
-        self.groups_listbox.bind("<<ListboxSelect>>", self.on_group_select)
+        self.groups_listbox.bind("<Double-Button-1>", self.on_group_double_click)  # исправлено
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=5)
@@ -44,21 +44,25 @@ class ManageUsersForm(tk.Toplevel):
 
         self.groups_listbox.delete(0, tk.END)
         self.groups = self.db.get_groups()
-        for group in self.groups:
-            self.groups_listbox.insert(tk.END, f"{group[0]}: {group[1]}")
-        if self.groups:
-            self.groups_listbox.select_set(0)
+        for i, group in enumerate(self.groups, 1):  # корректная нумерация
+            self.groups_listbox.insert(tk.END, f"{i}. {group[1]}")
+        # Не выделяем автоматически первую строку!
 
-    def on_group_select(self, event=None):
-        selection = self.groups_listbox.curselection()
-        if not selection:
+    def on_group_double_click(self, event):
+        # Проверяем, что клик по элементу, а не по пустому месту
+        idx = self.groups_listbox.nearest(event.y)
+        if idx < 0 or idx >= len(self.groups):
             return
-        group_id = self.groups[selection[0]][0]
+        self.groups_listbox.selection_clear(0, tk.END)
+        self.groups_listbox.selection_set(idx)
+        group_id = self.groups[idx][0]
         GroupUsersForm(self, group_id)
 
     def open_groups_form(self):
         from groups_form import GroupsForm
-        GroupsForm(self)
+        form = GroupsForm(self)
+        self.wait_window(form)
+        self.load_users()
 
     def go_back(self):
         self.destroy()
