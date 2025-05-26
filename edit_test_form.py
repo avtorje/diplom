@@ -82,21 +82,20 @@ class EditTestForm(tk.Toplevel):
                 messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
                 return
             self.db.add_question(self.test_id, q_text, options, correct)
-            self.load_questions()
+            self.load_questions()  # <-- ДОБАВИТЬ ЭТУ СТРОКУ
             messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
         except Exception as e:
             messagebox.showerror("Ошибка", str(e), parent=self)
 
     def view_question(self):
         idx = self.get_selected_index("просмотра")
-        if idx is None: return
-        self.load_questions()  # Всегда обновлять данные перед просмотром
+        if idx is None:
+            return
+        self.load_questions()
+        if idx < 0 or idx >= len(self.questions):
+            messagebox.showerror("Ошибка", "Некорректный выбор вопроса.", parent=self)
+            return
         q = self.questions[idx]
-        if q['options']:
-            for i, opt in enumerate(q['options']):
-                tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left").pack(pady=5, anchor="w", fill="x")
-        else:
-            tk.Label(frame, text="Нет вариантов ответа", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
         win = tk.Toplevel(self)
         win.title("Просмотр вопроса")
         self.center_window(win)
@@ -121,7 +120,7 @@ class EditTestForm(tk.Toplevel):
                 tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left").pack(pady=5, anchor="w", fill="x")
         else:
             tk.Label(frame, text="Нет вариантов ответа", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
-
+            
         # Правильные ответы
         tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
         corr_lbls = [
@@ -175,9 +174,9 @@ class EditTestForm(tk.Toplevel):
     def open_input_dialog(self, title, prompt, default=""):
         return simpledialog.askstring(title, prompt, initialvalue=default, parent=self)
 
-    def get_selected_index(self, action):
-        idxs = self.questions_listbox.curselection()
-        if not idxs:
-            messagebox.showerror("Ошибка", f"Выберите вопрос для {action}.", parent=self)
+    def get_selected_index(self, action="действия"):
+        selection = self.questions_listbox.curselection()
+        if not selection:
+            messagebox.showinfo("Выбор вопроса", f"Выберите вопрос для {action}.", parent=self)
             return None
-        return idxs[0]
+        return selection[0]
