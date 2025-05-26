@@ -104,25 +104,29 @@ class EditTestForm(tk.Toplevel):
         canvas.create_window((20, 0), window=frame, anchor="nw")
         frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
+        # Вопрос
         q_lbl = tk.Label(frame, text=q['text'], font=("Arial", 14), background="#f0f0f0", anchor="center", justify="center")
         q_lbl.pack(pady=10, fill="x")
         tk.Label(frame, text="Варианты ответов:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
-        ans_lbls = [tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left")
-                    for i, opt in enumerate(q['options'])]
-        for lbl in ans_lbls: lbl.pack(pady=5, anchor="w", fill="x")
+
+        # Варианты ответов
+        if q['options']:
+            for i, opt in enumerate(q['options']):
+                tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left").pack(pady=5, anchor="w", fill="x")
+        else:
+            tk.Label(frame, text="Нет вариантов ответа", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
+
+        # Правильные ответы
         tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
-        corr_lbls = [tk.Label(frame, text=f"{i+1}. {q['options'][i]}", font=("Arial", 12), fg="green", background="#f0f0f0", anchor="w", justify="left")
-                     for i in q.get('correct_option',[])]
-        for lbl in corr_lbls: lbl.pack(pady=5, anchor="w", fill="x")
-        def update_wrap(event):
-            w = max(event.width-40, 100)
-            q_lbl.config(wraplength=w)
-            for lbl in ans_lbls + corr_lbls: lbl.config(wraplength=w)
-        canvas.bind("<Configure>", update_wrap)
-        win.update_idletasks()
-        initial_w = max(canvas.winfo_width()-40, 100)
-        q_lbl.config(wraplength=initial_w)
-        for lbl in ans_lbls + corr_lbls: lbl.config(wraplength=initial_w)
+        corr_lbls = [
+            tk.Label(frame, text=f"{i+1}. {q['options'][i]}", font=("Arial", 12), fg="green", background="#f0f0f0", anchor="w", justify="left")
+            for i in q.get('correct_option', [])
+            if isinstance(i, int) and 0 <= i < len(q['options'])
+        ]
+        if corr_lbls:
+            for lbl in corr_lbls: lbl.pack(pady=5, anchor="w", fill="x")
+        else:
+            tk.Label(frame, text="Нет правильных ответов", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
 
     def edit_question(self):
         idx = self.get_selected_index("редактирования")
