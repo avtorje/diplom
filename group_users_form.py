@@ -8,9 +8,9 @@ class GroupUsersForm(tk.Toplevel):
         super().__init__(parent)
         self.db = Database()
         self.group_id = group_id
-        self.title("Пользователи группы")
+        self.title(f"Пользователи группы {self.get_group_name()}")
         self.center_window(350, 650)
-        self.create_widgets()
+        self._create_widgets()  # исправлено!
         self._load_group_users()
 
     def center_window(self, width=350, height=650):
@@ -72,8 +72,8 @@ class GroupUsersForm(tk.Toplevel):
         return None
 
     def _add_user(self):
-        UserForm(self, "Добавить пользователя", group_id=self.group_id)
-        self.wait_window()
+        form = UserForm(self, "Добавить пользователя", group_id=self.group_id)
+        self.wait_window(form)
         self._load_group_users()
 
     def _edit_user(self):

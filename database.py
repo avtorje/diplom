@@ -102,6 +102,24 @@ class Database:
             query = "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?, ?)"
         self._execute(query, tuple(params))
 
+    def update_user(self, user_id, username, password, role, group_id):
+        import hashlib
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # Если пароль не передан, не обновлять его
+            if password:
+                password_hash = hashlib.sha256(password.encode()).hexdigest()
+                cursor.execute(
+                    "UPDATE USERS SET username=?, password=?, role=?, group_id=? WHERE id=?",
+                    (username, password_hash, role, group_id, user_id)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE USERS SET username=?, role=?, group_id=? WHERE id=?",
+                    (username, role, group_id, user_id)
+                )
+            conn.commit()
+
     def delete_user(self, user_id):
         self._execute("DELETE FROM USERS WHERE id=?", (user_id,))
 

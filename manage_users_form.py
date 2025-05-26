@@ -48,7 +48,6 @@ class ManageUsersForm(tk.Toplevel):
             self.groups_listbox.insert(tk.END, f"{group[0]}: {group[1]}")
         if self.groups:
             self.groups_listbox.select_set(0)
-            self.on_group_select(None)
 
     def on_group_select(self, event=None):
         selection = self.groups_listbox.curselection()

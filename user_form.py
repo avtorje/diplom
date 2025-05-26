@@ -9,12 +9,20 @@ class UserForm(tk.Toplevel):
         self.user_id = user_id
         self.forced_group_id = group_id
         self.title(title)
-        self.geometry("400x400")
+        self.center_window(400, 400)
         self.groups = self.db.get_groups()
         self.parent = parent
         self.create_widgets()
         if user_id:
             self.load_user()
+
+    def center_window(self, width=400, height=400):
+        self.update_idletasks()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def create_widgets(self):
         tk.Label(self, text="Имя пользователя:").pack()
