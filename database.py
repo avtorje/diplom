@@ -80,6 +80,19 @@ class Database:
             pass
 
     # --- Пользователи ---
+    def add_user(self, username, password, role, group_id):
+        password_hash = hashlib.sha256(password.encode()).hexdigest() if password else None
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "INSERT INTO USERS (username, password, role, group_id) VALUES (?, ?, ?, ?)",
+                    (username, password_hash, role, group_id)
+                )
+                conn.commit()
+            except sqlite3.IntegrityError:
+                raise ValueError("Пользователь с таким именем уже существует")
+            
     def add_or_update_user(self, user_id=None, username=None, password=None, role=None, group_id=None, first_name=None, last_name=None, middle_name=None):
         params = [username, self.hash_password(password) if password and role == "admin" else None, role, group_id, first_name, last_name, middle_name]
         if user_id:

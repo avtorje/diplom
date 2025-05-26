@@ -8,10 +8,18 @@ class GroupUsersForm(tk.Toplevel):
         super().__init__(parent)
         self.db = Database()
         self.group_id = group_id
-        self.title(f"Пользователи группы {self.get_group_name()}")
-        self.geometry("350x600")
-        self._create_widgets()
+        self.title("Пользователи группы")
+        self.center_window(350, 650)
+        self.create_widgets()
         self._load_group_users()
+
+    def center_window(self, width=350, height=650):
+        self.update_idletasks()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def get_group_name(self):
         group = self.db._execute("SELECT name FROM GROUPS WHERE id=?", (self.group_id,), fetch=True)
@@ -32,6 +40,18 @@ class GroupUsersForm(tk.Toplevel):
             tk.Button(self, text=text, command=cmd).pack(pady=2 if text != "Закрыть" else 5)
 
     def _load_group_users(self):
+        if not self.winfo_exists():
+            return
+        if not self.admins_listbox.winfo_exists() or not self.students_listbox.winfo_exists():
+            return
+        if not getattr(self, 'admins_listbox', None) or not getattr(self, 'students_listbox', None):
+            return
+        if not self.admins_listbox.winfo_exists() or not self.students_listbox.winfo_exists():
+            return
+
+        self.admins_listbox.delete(0, tk.END)
+        self.students_listbox.delete(0, tk.END)
+
         for lb, getter, id_attr in [
             (self.admins_listbox, self.db.get_admins_by_group, "admin_ids"),
             (self.students_listbox, self.db.get_students_by_group, "student_ids")

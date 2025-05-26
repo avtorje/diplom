@@ -1,8 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
 from database import Database
-from groups_form import GroupsForm
-from user_form import UserForm
 from group_users_form import GroupUsersForm
 
 class ManageUsersForm(tk.Toplevel):
@@ -10,10 +8,18 @@ class ManageUsersForm(tk.Toplevel):
         super().__init__(parent)
         self.db = Database()
         self.title("Управление пользователями")
-        self.geometry("500x500")
+        self.center_window(500, 500)
         self.parent = parent
         self.create_widgets()
         self.load_users()
+
+    def center_window(self, width=500, height=500):
+        self.update_idletasks()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def create_widgets(self):
         tk.Label(self, text="Главный администратор", font=("Arial", 14, "bold")).pack(pady=5)
@@ -44,11 +50,12 @@ class ManageUsersForm(tk.Toplevel):
             self.groups_listbox.select_set(0)
             self.on_group_select(None)
 
-    def on_group_select(self, event):
+    def on_group_select(self, event=None):
         selection = self.groups_listbox.curselection()
-        if selection:
-            group_id = self.groups[selection[0]][0]
-            GroupUsersForm(self, group_id)
+        if not selection:
+            return
+        group_id = self.groups[selection[0]][0]
+        GroupUsersForm(self, group_id)
 
     def open_groups_form(self):
         from groups_form import GroupsForm
