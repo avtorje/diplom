@@ -73,20 +73,24 @@ class EditTestForm(tk.Toplevel):
         return q_text, options, list(set(indices))
 
     def add_question(self):
-        data = self.ask_question_data()
-        if not data: return
-        q_text, options, correct = data
-        if any(q['text'].strip().lower() == q_text.strip().lower() for q in self.questions):
-            messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
-            return
-        self.db.add_question(self.test_id, q_text, options, correct)
-        self.load_questions()
-        last_idx = len(self.questions)
-        if last_idx > 0:
-            self.questions_listbox.selection_clear(0, tk.END)
-            self.questions_listbox.selection_set(last_idx-1)
-            self.questions_listbox.activate(last_idx-1)
-        messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
+        try:
+            data = self.ask_question_data()
+            if not data:
+                return
+            q_text, options, correct = data
+            if any(q['text'].strip().lower() == q_text.strip().lower() for q in self.questions):
+                messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
+                return
+            self.db.add_question(self.test_id, q_text, options, correct)
+            self.load_questions()  # Обновляем self.questions и self.questions_listbox
+            # Выделяем последний добавленный вопрос
+            if self.questions:
+                self.questions_listbox.selection_clear(0, tk.END)
+                self.questions_listbox.selection_set(len(self.questions) - 1)
+                self.questions_listbox.activate(len(self.questions) - 1)
+            messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
+        except Exception as e:
+            messagebox.showerror("Ошибка", str(e), parent=self)
 
     def show_question(self, view_only=True):
         idx = self.get_selected_index("просмотра" if view_only else "редактирования")
@@ -145,6 +149,12 @@ class EditTestForm(tk.Toplevel):
             self.renumber_questions()
             self.load_questions()
             messagebox.showinfo("Вопрос удалён", "Вопрос успешно удалён.", parent=self)
+
+    def view_question(self):
+        idx = self.get_selected_index("просмотра")
+        if idx is None:
+            return
+        q = self.questions[idx]
 
     def renumber_questions(self):
         for idx, q in enumerate(self.db.get_questions(self.test_id)):
