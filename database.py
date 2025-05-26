@@ -192,7 +192,7 @@ class Database:
 
     # --- Группы ---
     def get_groups(self):
-        return self._execute("SELECT id, name FROM GROUPS", fetch=True)
+        return self._execute("SELECT id, name FROM GROUPS ORDER BY id ASC", fetch=True)
 
     def add_group(self, name, access_code):
         self._execute("INSERT INTO GROUPS (name, access_code) VALUES (?, ?)", (name, access_code))
