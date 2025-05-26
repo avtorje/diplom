@@ -15,7 +15,6 @@ class Database:
             if fetch:
                 return cursor.fetchall()
             conn.commit()
-            return cursor
 
     def initialize(self):
         self._create_tables()
@@ -85,46 +84,28 @@ class Database:
         except sqlite3.IntegrityError:
             pass
 
+    @staticmethod
+    def hash_password(password):
+        return hashlib.sha256(password.encode()).hexdigest() if password else None
+
     # --- Пользователи ---
-    def add_user(self, username, password, role, group_id):
-        password_hash = hashlib.sha256(password.encode()).hexdigest() if password else None
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute(
-                    "INSERT INTO USERS (username, password, role, group_id) VALUES (?, ?, ?, ?)",
-                    (username, password_hash, role, group_id)
-                )
-                conn.commit()
-            except sqlite3.IntegrityError:
-                raise ValueError("Пользователь с таким именем уже существует")
-            
     def add_or_update_user(self, user_id=None, username=None, password=None, role=None, group_id=None, first_name=None, last_name=None, middle_name=None):
-        params = [username, self.hash_password(password) if password and role == "admin" else None, role, group_id, first_name, last_name, middle_name]
+        password_hash = self.hash_password(password) if password else None
         if user_id:
-            query = "UPDATE USERS SET username=?, password=?, role=?, group_id=?, first_name=?, last_name=?, middle_name=? WHERE id=?"
+            fields = ["username=?", "role=?", "group_id=?", "first_name=?", "last_name=?", "middle_name=?"]
+            params = [username, role, group_id, first_name, last_name, middle_name]
+            if password_hash:
+                fields.insert(1, "password=?")
+                params.insert(1, password_hash)
+            query = f"UPDATE USERS SET {', '.join(fields)} WHERE id=?"
             params.append(user_id)
         else:
             query = "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        self._execute(query, tuple(params))
-
-    def update_user(self, user_id, username, password, role, group_id):
-        import hashlib
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            # Если пароль не передан, не обновлять его
-            if password:
-                password_hash = hashlib.sha256(password.encode()).hexdigest()
-                cursor.execute(
-                    "UPDATE USERS SET username=?, password=?, role=?, group_id=? WHERE id=?",
-                    (username, password_hash, role, group_id, user_id)
-                )
-            else:
-                cursor.execute(
-                    "UPDATE USERS SET username=?, role=?, group_id=? WHERE id=?",
-                    (username, role, group_id, user_id)
-                )
-            conn.commit()
+            params = [username, password_hash, role, group_id, first_name, last_name, middle_name]
+        try:
+            self._execute(query, tuple(params))
+        except sqlite3.IntegrityError:
+            raise ValueError("Пользователь с таким именем уже существует")
 
     def delete_user(self, user_id):
         self._execute("DELETE FROM USERS WHERE id=?", (user_id,))
@@ -151,32 +132,22 @@ class Database:
                 query += " AND id != ?"
                 params.append(main_admin[0])
         return self._execute(query, tuple(params), fetch=True)
-    
+
     def get_admins_by_group(self, group_id):
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, username, role FROM USERS WHERE role='admin' AND username != 'admin' AND group_id = ?",
-                (group_id,)
-            )
-            return cursor.fetchall()
+        return self._execute(
+            "SELECT id, username, role FROM USERS WHERE role='admin' AND username != 'admin' AND group_id = ?",
+            (group_id,), fetch=True
+        )
 
     def get_students_by_group(self, group_id):
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, username, role FROM USERS WHERE role='student' AND group_id = ?",
-                (group_id,)
-            )
-            return cursor.fetchall()
+        return self._execute(
+            "SELECT id, username, role FROM USERS WHERE role='student' AND group_id = ?",
+            (group_id,), fetch=True
+        )
 
     def get_main_admin(self):
         result = self._execute("SELECT id, username, role FROM USERS WHERE role='admin' AND username='admin'", fetch=True)
         return result[0] if result else None
-
-    def get_users_main_list(self):
-        main_admin = self.get_main_admin()
-        return [main_admin] if main_admin else []
 
     def check_admin_password(self, admin_id, password):
         row = self._execute("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,), fetch=True)
@@ -184,10 +155,6 @@ class Database:
 
     def update_admin_password(self, admin_id, new_password):
         self._execute("UPDATE USERS SET password=? WHERE id=? AND role='admin'", (self.hash_password(new_password), admin_id))
-
-    @staticmethod
-    def hash_password(password):
-        return hashlib.sha256(password.encode()).hexdigest()
 
     def validate_user(self, username, password):
         result = self._execute(
@@ -231,8 +198,11 @@ class Database:
             raise ValueError("Тест с таким названием уже существует.")
 
     def add_test_groups(self, test_id, group_ids):
-        for gid in group_ids:
-            self._execute("INSERT INTO THEME_GROUP (theme_id, group_id) VALUES (?, ?)", (test_id, gid))
+        self._execute(
+            "INSERT INTO THEME_GROUP (theme_id, group_id) VALUES (?, ?)",
+            [(test_id, gid) for gid in group_ids],
+            many=True
+        )
 
     def delete_test(self, test_id):
         question_ids = self._execute("SELECT id FROM QUESTION WHERE theme_id = ?", (test_id,), fetch=True)
@@ -263,11 +233,10 @@ class Database:
         return questions
 
     def add_question(self, theme_id, text, options, correct_options):
-        cursor = self._execute(
+        theme_local_number = self._execute(
             "SELECT COALESCE(MAX(theme_local_number), 0) + 1 FROM QUESTION WHERE theme_id = ?",
             (theme_id,), fetch=True
-        )
-        theme_local_number = cursor[0][0]
+        )[0][0]
         self._execute(
             "INSERT INTO QUESTION (theme_id, text, correct_option, theme_local_number) VALUES (?, ?, ?, ?)",
             (theme_id, text, ",".join(map(str, correct_options)), theme_local_number)

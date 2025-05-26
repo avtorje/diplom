@@ -11,7 +11,6 @@ class EditTestForm(tk.Toplevel):
         self.title("Редактирование теста")
         self.geometry("500x400")
         self.center_window()
-        self.questions = self.db.get_questions(test_id)
         self.create_widgets()
         self.load_questions()
 
@@ -21,8 +20,8 @@ class EditTestForm(tk.Toplevel):
         self.questions_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
         actions = [
             ("Добавить вопрос", self.add_question),
-            ("Просмотреть вопрос", self.view_question),
-            ("Редактировать вопрос", self.edit_question),
+            ("Просмотреть вопрос", lambda: self.show_question(view_only=True)),
+            ("Редактировать вопрос", lambda: self.show_question(view_only=False)),
             ("Удалить вопрос", self.delete_question),
             ("Назад", self.go_back)
         ]
@@ -74,33 +73,59 @@ class EditTestForm(tk.Toplevel):
         return q_text, options, list(set(indices))
 
     def add_question(self):
-        try:
-            data = self.ask_question_data()
+        data = self.ask_question_data()
+        if not data: return
+        q_text, options, correct = data
+        if any(q['text'].strip().lower() == q_text.strip().lower() for q in self.questions):
+            messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
+            return
+        self.db.add_question(self.test_id, q_text, options, correct)
+        self.load_questions()
+        last_idx = len(self.questions)
+        if last_idx > 0:
+            self.questions_listbox.selection_clear(0, tk.END)
+            self.questions_listbox.selection_set(last_idx-1)
+            self.questions_listbox.activate(last_idx-1)
+        messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
+
+    def show_question(self, view_only=True):
+        idx = self.get_selected_index("просмотра" if view_only else "редактирования")
+        if idx is None: return
+        q = self.questions[idx]
+        if view_only:
+            self.show_question_window(q)
+        else:
+            data = self.ask_question_data(q["text"], q["options"], q.get("correct_option", []))
             if not data: return
             q_text, options, correct = data
-            if any(q['text'].strip().lower() == q_text.strip().lower() for q in self.questions):
-                messagebox.showerror("Ошибка", "Вопрос с таким текстом уже существует в этом тесте.", parent=self)
-                return
-            self.db.add_question(self.test_id, q_text, options, correct)
+            self.db.update_question(q["id"], q_text, options, correct)
             self.load_questions()
-            # --- ВЫДЕЛИТЬ добавленный вопрос (последний в списке)
-            if self.questions:
-                self.questions_listbox.selection_clear(0, tk.END)
-                self.questions_listbox.selection_set(len(self.questions)-1)
-                self.questions_listbox.activate(len(self.questions)-1)
-            messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
-        except Exception as e:
-            messagebox.showerror("Ошибка", str(e), parent=self)
+            messagebox.showinfo("Успешно", "Вопрос успешно обновлён.", parent=self)
 
-    def view_question(self):
-        idx = self.get_selected_index("просмотра")
-        if idx is None:
-            return
-        q = self.questions[idx]
+    def show_question_window(self, q):
         win = tk.Toplevel(self)
         win.title("Просмотр вопроса")
         self.center_window(win)
         win.geometry("400x400")
+        frame = self.create_scrollable_frame(win)
+        tk.Label(frame, text=q['text'], font=("Arial", 14), background="#f0f0f0", anchor="center", justify="center").pack(pady=10, fill="x")
+        tk.Label(frame, text="Варианты ответов:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
+        if q['options']:
+            for i, opt in enumerate(q['options']):
+                tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left").pack(pady=5, anchor="w", fill="x")
+        else:
+            tk.Label(frame, text="Нет вариантов ответа", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
+        tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
+        corr_lbls = [
+            tk.Label(frame, text=f"{i+1}. {q['options'][i]}", font=("Arial", 12), fg="green", background="#f0f0f0", anchor="w", justify="left")
+            for i in q.get('correct_option', []) if isinstance(i, int) and 0 <= i < len(q['options'])
+        ]
+        if corr_lbls:
+            for lbl in corr_lbls: lbl.pack(pady=5, anchor="w", fill="x")
+        else:
+            tk.Label(frame, text="Нет правильных ответов", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
+
+    def create_scrollable_frame(self, win):
         canvas = tk.Canvas(win, borderwidth=0, background="#f0f0f0")
         frame = tk.Frame(canvas, background="#f0f0f0")
         vscroll = tk.Scrollbar(win, orient="vertical", command=canvas.yview)
@@ -109,41 +134,7 @@ class EditTestForm(tk.Toplevel):
         canvas.pack(side="left", fill="both", expand=True)
         canvas.create_window((20, 0), window=frame, anchor="nw")
         frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-
-        # Вопрос
-        q_lbl = tk.Label(frame, text=q['text'], font=("Arial", 14), background="#f0f0f0", anchor="center", justify="center")
-        q_lbl.pack(pady=10, fill="x")
-        tk.Label(frame, text="Варианты ответов:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
-
-        # Варианты ответов
-        if q['options']:
-            for i, opt in enumerate(q['options']):
-                tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left").pack(pady=5, anchor="w", fill="x")
-        else:
-            tk.Label(frame, text="Нет вариантов ответа", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
-
-        # Правильные ответы
-        tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
-        corr_lbls = [
-            tk.Label(frame, text=f"{i+1}. {q['options'][i]}", font=("Arial", 12), fg="green", background="#f0f0f0", anchor="w", justify="left")
-            for i in q.get('correct_option', [])
-            if isinstance(i, int) and 0 <= i < len(q['options'])
-        ]
-        if corr_lbls:
-            for lbl in corr_lbls: lbl.pack(pady=5, anchor="w", fill="x")
-        else:
-            tk.Label(frame, text="Нет правильных ответов", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
-            
-    def edit_question(self):
-        idx = self.get_selected_index("редактирования")
-        if idx is None: return
-        q = self.questions[idx]
-        data = self.ask_question_data(q["text"], q["options"], q.get("correct_option", []))
-        if not data: return
-        q_text, options, correct = data
-        self.db.update_question(q["id"], q_text, options, correct)
-        self.load_questions()
-        messagebox.showinfo("Успешно", "Вопрос успешно обновлён.", parent=self)
+        return frame
 
     def delete_question(self):
         idx = self.get_selected_index("удаления")
