@@ -90,7 +90,13 @@ class EditTestForm(tk.Toplevel):
     def view_question(self):
         idx = self.get_selected_index("просмотра")
         if idx is None: return
+        self.load_questions()  # Всегда обновлять данные перед просмотром
         q = self.questions[idx]
+        if q['options']:
+            for i, opt in enumerate(q['options']):
+                tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left").pack(pady=5, anchor="w", fill="x")
+        else:
+            tk.Label(frame, text="Нет вариантов ответа", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
         win = tk.Toplevel(self)
         win.title("Просмотр вопроса")
         self.center_window(win)

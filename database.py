@@ -243,7 +243,7 @@ class Database:
 
     def get_questions(self, theme_id):
         query = """
-            SELECT q.id, q.theme_local_number, q.text, q.correct_option, GROUP_CONCAT(a.text)
+            SELECT q.id, q.theme_local_number, q.text, q.correct_option, GROUP_CONCAT(a.text, '|||')
             FROM QUESTION q
             LEFT JOIN ANSWER a ON q.id = a.question_id
             WHERE q.theme_id = ?
@@ -252,7 +252,7 @@ class Database:
         rows = self._execute(query, (theme_id,), fetch=True)
         questions = []
         for row in rows:
-            options = row[4].split(",") if row[4] else []
+            options = row[4].split("|||") if row[4] else []
             questions.append({
                 "id": row[0],
                 "theme_local_number": row[1],
