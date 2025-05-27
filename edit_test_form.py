@@ -114,9 +114,22 @@ class EditTestForm(tk.Toplevel):
         win.geometry("400x400")
         self.center_window(win)
 
-        frame = self.create_scrollable_frame(win)
-
+        frame, canvas = self.create_scrollable_frame(win)
         all_dynamic_labels = []
+
+        def update_wraplength_now(event=None):
+            new_width = canvas.winfo_width() - 40
+            for lbl in all_dynamic_labels:
+                lbl.config(wraplength=new_width)
+
+        def update_wraplength_delayed(event):
+            nonlocal resize_after_id
+            if resize_after_id:
+                win.after_cancel(resize_after_id)
+            resize_after_id = win.after(100, update_wraplength_now)
+
+        resize_after_id = None
+        win.bind("<Configure>", update_wraplength_delayed)
 
         # Заголовок вопроса
         q_label = tk.Label(
@@ -183,21 +196,12 @@ class EditTestForm(tk.Toplevel):
             no_corr.grid(row=next_row, column=0, sticky="n", pady=5)
             all_dynamic_labels.append(no_corr)
 
-        # Debounce — задержка на обновление wraplength
-        resize_after_id = None
+        # 🛠️ Вызов обновления wraplength один раз после полной инициализации окна
+        def force_initial_wrap():
+            update_wraplength_now()
 
-        def update_wraplength_now(event):
-            new_width = event.width - 40
-            for lbl in all_dynamic_labels:
-                lbl.config(wraplength=new_width)
+        win.after(100, force_initial_wrap)
 
-        def update_wraplength_delayed(event):
-            nonlocal resize_after_id
-            if resize_after_id:
-                win.after_cancel(resize_after_id)
-            resize_after_id = win.after(100, lambda: update_wraplength_now(event))
-
-        win.bind("<Configure>", update_wraplength_delayed)
 
     def create_scrollable_frame(self, win):
         container = tk.Frame(win)
@@ -210,17 +214,25 @@ class EditTestForm(tk.Toplevel):
         vscroll.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
 
-        scrollable_frame = tk.Frame(canvas, background="#f0f0f0")
-        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        # 🎯 Вложенный контейнер, выравнивающий всё по центру
+        outer_frame = tk.Frame(canvas, background="#f0f0f0")
+        canvas.create_window((0, 0), window=outer_frame, anchor="n", tags="inner")
 
-        window_id = canvas.create_window((0, 0), window=scrollable_frame, anchor="n", width=canvas.winfo_width())
+        scrollable_frame = tk.Frame(outer_frame, background="#f0f0f0")
+        scrollable_frame.pack(anchor="n", pady=20)  # <-- по центру сверху
+
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        outer_frame.bind("<Configure>", on_frame_configure)
 
         def on_canvas_configure(event):
-            canvas.itemconfig(window_id, width=event.width)
+            canvas.itemconfig("inner", width=event.width)
 
         canvas.bind("<Configure>", on_canvas_configure)
 
-        return scrollable_frame
+        return scrollable_frame, canvas
+
 
     def delete_question(self):
         idx = self.get_selected_index("удаления")
