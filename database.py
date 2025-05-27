@@ -3,6 +3,7 @@ import hashlib
 
 class Database:
     def __init__(self, db_path="database.db"):
+        self.conn = sqlite3.connect("database.db")
         self.db_path = db_path
 
     def _execute(self, query, params=(), fetch=False, many=False):
@@ -237,17 +238,17 @@ class Database:
             "SELECT COALESCE(MAX(theme_local_number), 0) + 1 FROM QUESTION WHERE theme_id = ?",
             (theme_id,), fetch=True
         )[0][0]
-        self._execute(
+        cursor = self.conn.cursor()
+        cursor.execute(
             "INSERT INTO QUESTION (theme_id, text, correct_options, theme_local_number) VALUES (?, ?, ?, ?)",
             (theme_id, text, ",".join(map(str, correct_options)), theme_local_number)
         )
-        question_id = self._execute("SELECT last_insert_rowid()", fetch=True)[0][0]
-        if options:  # <<< обязательно!
-            self._execute(
-                "INSERT INTO ANSWER (question_id, text) VALUES (?, ?)",
-                [(question_id, options) for options in options],
-                many=True
-            )
+        question_id = cursor.lastrowid
+        cursor.executemany(
+            "INSERT INTO ANSWER (question_id, text) VALUES (?, ?)",
+            [(question_id, option) for option in options]
+        )
+        self.conn.commit()
 
     def update_question(self, question_id, text, options, correct_options):
         self._execute(
