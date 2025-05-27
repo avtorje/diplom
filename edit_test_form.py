@@ -116,7 +116,6 @@ class EditTestForm(tk.Toplevel):
 
         frame = self.create_scrollable_frame(win)
 
-        # Собираем метки с wraplength, чтобы потом обновлять их
         all_dynamic_labels = []
 
         # Заголовок вопроса
@@ -222,19 +221,6 @@ class EditTestForm(tk.Toplevel):
         canvas.bind("<Configure>", on_canvas_configure)
 
         return scrollable_frame
-
-
-    def update_wraplength_delayed(event):
-        nonlocal resize_after_id
-        if resize_after_id:
-            win.after_cancel(resize_after_id)
-        resize_after_id = win.after(100, lambda: do_update(event))
-
-    def do_update(event):
-        new_width = event.width - 40
-        for lbl in all_dynamic_labels:
-            lbl.config(wraplength=new_width)
-
 
     def delete_question(self):
         idx = self.get_selected_index("удаления")
