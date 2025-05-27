@@ -227,7 +227,7 @@ class Database:
                 "id": row[0],
                 "theme_local_number": row[1],
                 "text": row[2],
-                "correct_options": list(map(int, row[3].split(","))),
+                "correct_options": list(map(int, row[3].split(","))) if row[3] else [],
                 "options": options
             })
         return questions
@@ -242,11 +242,12 @@ class Database:
             (theme_id, text, ",".join(map(str, correct_options)), theme_local_number)
         )
         question_id = self._execute("SELECT last_insert_rowid()", fetch=True)[0][0]
-        self._execute(
-            "INSERT INTO ANSWER (question_id, text) VALUES (?, ?)",
-            [(question_id, option) for option in options],
-            many=True
-        )
+        if options:  # <<< обязательно!
+            self._execute(
+                "INSERT INTO ANSWER (question_id, text) VALUES (?, ?)",
+                [(question_id, options) for options in options],
+                many=True
+            )
 
     def update_question(self, question_id, text, options, correct_options):
         self._execute(
@@ -256,7 +257,7 @@ class Database:
         self._execute("DELETE FROM ANSWER WHERE question_id = ?", (question_id,))
         self._execute(
             "INSERT INTO ANSWER (question_id, text) VALUES (?, ?)",
-            [(question_id, option) for option in options],
+            [(question_id, options) for options in options],
             many=True
         )
 
