@@ -111,36 +111,130 @@ class EditTestForm(tk.Toplevel):
     def show_question_window(self, q):
         win = tk.Toplevel(self)
         win.title("Просмотр вопроса")
-        self.center_window(win)
         win.geometry("400x400")
+        self.center_window(win)
+
         frame = self.create_scrollable_frame(win)
-        tk.Label(frame, text=q['text'], font=("Arial", 14), background="#f0f0f0", anchor="center", justify="center").pack(pady=10, fill="x")
-        tk.Label(frame, text="Варианты ответов:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
+
+        # Собираем метки с wraplength, чтобы потом обновлять их
+        all_dynamic_labels = []
+
+        # Заголовок вопроса
+        q_label = tk.Label(
+            frame, text=q['text'], font=("Arial", 14),
+            background="#f0f0f0", justify="center", anchor="center", wraplength=360
+        )
+        q_label.grid(row=0, column=0, pady=(10, 5), sticky="n")
+        all_dynamic_labels.append(q_label)
+
+        # "Варианты ответов"
+        opt_title = tk.Label(
+            frame, text="Варианты ответов:", font=("Arial", 12),
+            background="#f0f0f0", justify="center", anchor="center", wraplength=360
+        )
+        opt_title.grid(row=1, column=0, pady=(5, 5), sticky="n")
+        all_dynamic_labels.append(opt_title)
+
         if q['options']:
             for i, opt in enumerate(q['options']):
-                tk.Label(frame, text=f"{i+1}. {opt}", font=("Arial", 12), background="#f0f0f0", anchor="w", justify="left").pack(pady=5, anchor="w", fill="x")
+                lbl = tk.Label(
+                    frame, text=f"{i+1}. {opt}", font=("Arial", 12),
+                    background="#f0f0f0", justify="left", anchor="w", wraplength=360
+                )
+                lbl.grid(row=2 + i, column=0, sticky="w", padx=20, pady=2)
+                all_dynamic_labels.append(lbl)
+            next_row = 2 + len(q['options'])
         else:
-            tk.Label(frame, text="Нет вариантов ответа", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
-        tk.Label(frame, text="Правильные ответы:", font=("Arial", 12), background="#f0f0f0").pack(pady=5)
+            no_opt = tk.Label(
+                frame, text="Нет вариантов ответа", font=("Arial", 12),
+                background="#f0f0f0", fg="red", justify="center", anchor="center", wraplength=360
+            )
+            no_opt.grid(row=2, column=0, sticky="n", pady=5)
+            all_dynamic_labels.append(no_opt)
+            next_row = 3
+
+        # "Правильные ответы"
+        corr_title = tk.Label(
+            frame, text="Правильные ответы:", font=("Arial", 12),
+            background="#f0f0f0", justify="center", anchor="center", wraplength=360
+        )
+        corr_title.grid(row=next_row, column=0, pady=(10, 5), sticky="n")
+        all_dynamic_labels.append(corr_title)
+        next_row += 1
+
+        corr_indices = q.get('correct_options', [])
         corr_lbls = [
-            tk.Label(frame, text=f"{i+1}. {q['options'][i]}", font=("Arial", 12), fg="green", background="#f0f0f0", anchor="w", justify="left")
-            for i in q.get('correct_options', []) if isinstance(i, int) and 0 <= i < len(q['options'])
+            tk.Label(
+                frame, text=f"{i+1}. {q['options'][i]}", font=("Arial", 12), fg="green",
+                background="#f0f0f0", justify="left", anchor="w", wraplength=360
+            )
+            for i in corr_indices if isinstance(i, int) and 0 <= i < len(q['options'])
         ]
+
         if corr_lbls:
-            for lbl in corr_lbls: lbl.pack(pady=5, anchor="w", fill="x")
+            for lbl in corr_lbls:
+                lbl.grid(row=next_row, column=0, sticky="w", padx=20, pady=2)
+                all_dynamic_labels.append(lbl)
+                next_row += 1
         else:
-            tk.Label(frame, text="Нет правильных ответов", font=("Arial", 12), background="#f0f0f0", fg="red").pack(pady=5, anchor="w", fill="x")
+            no_corr = tk.Label(
+                frame, text="Нет правильных ответов", font=("Arial", 12),
+                background="#f0f0f0", fg="red", justify="center", anchor="center", wraplength=360
+            )
+            no_corr.grid(row=next_row, column=0, sticky="n", pady=5)
+            all_dynamic_labels.append(no_corr)
+
+        # Debounce — задержка на обновление wraplength
+        resize_after_id = None
+
+        def update_wraplength_now(event):
+            new_width = event.width - 40
+            for lbl in all_dynamic_labels:
+                lbl.config(wraplength=new_width)
+
+        def update_wraplength_delayed(event):
+            nonlocal resize_after_id
+            if resize_after_id:
+                win.after_cancel(resize_after_id)
+            resize_after_id = win.after(100, lambda: update_wraplength_now(event))
+
+        win.bind("<Configure>", update_wraplength_delayed)
 
     def create_scrollable_frame(self, win):
-        canvas = tk.Canvas(win, borderwidth=0, background="#f0f0f0")
-        frame = tk.Frame(canvas, background="#f0f0f0")
-        vscroll = tk.Scrollbar(win, orient="vertical", command=canvas.yview)
+        container = tk.Frame(win)
+        container.pack(fill="both", expand=True)
+
+        canvas = tk.Canvas(container, background="#f0f0f0", highlightthickness=0)
+        vscroll = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=vscroll.set)
+
         vscroll.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-        canvas.create_window((20, 0), window=frame, anchor="nw")
-        frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        return frame
+
+        scrollable_frame = tk.Frame(canvas, background="#f0f0f0")
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+        window_id = canvas.create_window((0, 0), window=scrollable_frame, anchor="n", width=canvas.winfo_width())
+
+        def on_canvas_configure(event):
+            canvas.itemconfig(window_id, width=event.width)
+
+        canvas.bind("<Configure>", on_canvas_configure)
+
+        return scrollable_frame
+
+
+    def update_wraplength_delayed(event):
+        nonlocal resize_after_id
+        if resize_after_id:
+            win.after_cancel(resize_after_id)
+        resize_after_id = win.after(100, lambda: do_update(event))
+
+    def do_update(event):
+        new_width = event.width - 40
+        for lbl in all_dynamic_labels:
+            lbl.config(wraplength=new_width)
+
 
     def delete_question(self):
         idx = self.get_selected_index("удаления")
