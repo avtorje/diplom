@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
 from database import Database
-from test_form import TestForm
 from result_form import ResultForm
 
 class StudentForm(tk.Toplevel):
@@ -15,7 +14,6 @@ class StudentForm(tk.Toplevel):
         self.resizable(False, False)
         self.center_window()
 
-        # Информация о студенте и группе
         group_id = self.db.get_user_group_id(self.user_id)
         group_info = self.db.get_group_by_id(group_id)
         group_name = group_info[1] if group_info else "Не определена"
@@ -46,8 +44,8 @@ class StudentForm(tk.Toplevel):
 
     def open_tests(self):
         self.withdraw()
-        #from test_selection_form import TestSelectionForm
-        #TestSelectionForm(self, self.user_id).mainloop()
+        from test_selection_form import TestSelectionForm
+        TestSelectionForm(self, self.user_id).mainloop()
         self.deiconify()
 
     def open_journal(self):

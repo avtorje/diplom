@@ -215,6 +215,16 @@ class Database:
 
     # --- Тесты и вопросы ---
     def get_all_tests(self, group_id=None):
+        if group_id is not None:
+            return self._execute("SELECT id, name FROM TESTS WHERE group_id=? OR group_id IS NULL", (group_id,), fetch=True)
+        else:
+            return self._execute("SELECT id, name FROM TESTS", fetch=True)
+        
+    def get_test_name(self, theme_id):
+        result = self._execute("SELECT name FROM THEME WHERE id=?", (theme_id,), fetch=True)
+        return result[0][0] if result else "Без названия"
+
+    def get_all_tests(self, group_id=None):
         if group_id is None:
             return self._execute("SELECT id, name FROM THEME", fetch=True)
         else:
