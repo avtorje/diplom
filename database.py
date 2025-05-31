@@ -185,6 +185,33 @@ class Database:
     def get_group_by_id(self, group_id):
         result = self._execute("SELECT id, name, access_code FROM GROUPS WHERE id=?", (group_id,), fetch=True)
         return result[0] if result else None
+    
+    def get_group_by_name(self, name):
+        result = self._execute(
+            "SELECT id, name, access_code FROM GROUPS WHERE name = ?", (name,), fetch=True
+        )
+        if result:
+            return {"id": result[0][0], "name": result[0][1], "access_code": result[0][2]}
+        return None
+    
+    def get_user_by_name_and_group(self, username, group_id):
+        result = self._execute(
+            "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE username = ? AND group_id = ?",
+            (username, group_id), fetch=True
+        )
+        if result:
+            return {
+                "id": result[0][0], "username": result[0][1], "role": result[0][2],
+                "group_id": result[0][3], "first_name": result[0][4],
+                "last_name": result[0][5], "middle_name": result[0][6]
+            }
+        return None
+    
+    def get_user_group_id(self, user_id):
+        result = self._execute(
+            "SELECT group_id FROM USERS WHERE id = ?", (user_id,), fetch=True
+        )
+        return result[0][0] if result and result[0][0] is not None else None
 
     # --- Тесты и вопросы ---
     def get_all_tests(self, group_id=None):

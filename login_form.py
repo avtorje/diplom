@@ -80,9 +80,9 @@ class LoginForm(tk.Tk):
             self.destroy()
             AdminForm(user[0]).mainloop()
         else:
-            messagebox.showinfo("Вход выполнен", f"Добро пожаловать, {user[1]}!")
+            messagebox.showinfo("Вход выполнен", f"Добро пожаловать, {user['username']}!")
             self.destroy()
-            StudentForm(user[0], user[1]).mainloop()
+            StudentForm(user['id'], user['username']).mainloop()
 
     def on_group_selected(self, event):
         group_name = self.group_combobox.get()
