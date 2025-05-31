@@ -81,7 +81,7 @@ class LoginForm(tk.Tk):
             AdminForm(user[0]).mainloop()
         else:
             messagebox.showinfo("Вход выполнен", f"Добро пожаловать, {user['username']}!")
-            self.destroy()
+            self.withdraw()
             StudentForm(user['id'], user['username']).mainloop()
 
     def on_group_selected(self, event):
