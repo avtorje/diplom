@@ -90,19 +90,24 @@ class Database:
         return hashlib.sha256(password.encode()).hexdigest() if password else None
 
     # --- Пользователи ---
-    def add_or_update_user(self, user_id=None, username=None, password=None, role=None, group_id=None, first_name=None, last_name=None, middle_name=None):
+    def add_user(self, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
         password_hash = self.hash_password(password) if password else None
-        if user_id:
-            fields = ["username=?", "role=?", "group_id=?", "first_name=?", "last_name=?", "middle_name=?"]
-            params = [username, role, group_id, first_name, last_name, middle_name]
-            if password_hash:
-                fields.insert(1, "password=?")
-                params.insert(1, password_hash)
-            query = f"UPDATE USERS SET {', '.join(fields)} WHERE id=?"
-            params.append(user_id)
-        else:
-            query = "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?, ?)"
-            params = [username, password_hash, role, group_id, first_name, last_name, middle_name]
+        query = "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        params = [username, password_hash, role, group_id, first_name, last_name, middle_name]
+        try:
+            self._execute(query, tuple(params))
+        except sqlite3.IntegrityError:
+            raise ValueError("Пользователь с таким именем уже существует")
+
+    def update_user(self, user_id, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
+        fields = ["username=?", "role=?", "group_id=?", "first_name=?", "last_name=?", "middle_name=?"]
+        params = [username, role, group_id, first_name, last_name, middle_name]
+        password_hash = self.hash_password(password) if password else None
+        if password_hash:
+            fields.insert(1, "password=?")
+            params.insert(1, password_hash)
+        query = f"UPDATE USERS SET {', '.join(fields)} WHERE id=?"
+        params.append(user_id)
         try:
             self._execute(query, tuple(params))
         except sqlite3.IntegrityError:
