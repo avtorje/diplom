@@ -3,16 +3,16 @@ from tkinter import messagebox
 from database import Database
 
 class TestForm(tk.Toplevel):
-    def __init__(self, parent, user_id, test_id):
+    def __init__(self, parent, user_id, theme_id):
         super().__init__(parent)
         self.db = Database()
         self.user_id = user_id
-        self.test_id = test_id
+        self.theme_id = theme_id
         self.current_question_index = 0
         self.answers = []
-        self.questions = self.db.get_questions(test_id)
-        self.title(f"Тест - {self.db.get_test_name(test_id)}")
-        self.geometry("400x400")
+        self.questions = self.db.get_questions(theme_id)
+        self.title(f"Тест - {self.db.get_test_name(theme_id)}")
+        self.geometry("500x400")
         self.parent = parent
 
         if not self.questions:
@@ -21,63 +21,121 @@ class TestForm(tk.Toplevel):
             return
 
         self.selected_option = tk.IntVar(value=-1)
+        self.all_dynamic_labels = []
         self.create_widgets()
         self.load_question()
 
     def create_widgets(self):
-        self.question_label = tk.Label(self, wraplength=380, font=("Arial", 14))
-        self.question_label.pack(pady=10)
+        # --- Scrollable area setup ---
+        self.container = tk.Frame(self)
+        self.container.pack(fill="both", expand=True)
 
-        self.options_frame = tk.Frame(self)
-        self.options_frame.pack(pady=10)
+        self.canvas = tk.Canvas(self.container, background="#f0f0f0", highlightthickness=0)
+        self.vscroll = tk.Scrollbar(self.container, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.vscroll.set)
 
-        tk.Button(self, text="Ответить", command=self.submit_answer).pack(pady=5)
+        self.vscroll.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
 
-        nav = tk.Frame(self)
-        nav.pack(pady=10)
-        tk.Button(nav, text="Предыдущий", command=lambda: self.navigate(-1)).grid(row=0, column=0, padx=5)
-        tk.Button(nav, text="Следующий", command=lambda: self.navigate(1)).grid(row=0, column=1, padx=5)
+        # --- Вложенный контейнер для скролла ---
+        self.outer_frame = tk.Frame(self.canvas, background="#f0f0f0")
+        self.canvas.create_window((0, 0), window=self.outer_frame, anchor="n", tags="inner")
 
-        tk.Button(self, text="Завершить тест", command=self.finish_test).pack(pady=5)
+        self.scrollable_frame = tk.Frame(self.outer_frame, background="#f0f0f0")
+        self.scrollable_frame.pack(anchor="n", pady=20)
+
+        # --- Привязка прокрутки ---
+        self.outer_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig("inner", width=e.width))
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+        # --- Кнопка "Следующий"/"Завершить тест" всегда видна внизу ---
+        self.next_button = tk.Button(self, text="Следующий", command=self.next_question)
+        self.next_button.pack(pady=10, side="bottom")
+
+        # --- Для wraplength ---
+        self.resize_after_id = None
+        self.bind("<Configure>", self.update_wraplength_delayed)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+    def update_wraplength_now(self, event=None):
+        new_width = self.canvas.winfo_width() - 40
+        for lbl in self.all_dynamic_labels:
+            lbl.config(wraplength=new_width)
+
+    def update_wraplength_delayed(self, event):
+        if self.resize_after_id:
+            self.after_cancel(self.resize_after_id)
+        self.resize_after_id = self.after(100, self.update_wraplength_now)
 
     def load_question(self):
-        q = self.questions[self.current_question_index]
-        self.question_label.config(text=f"Вопрос {q['theme_local_number']}: {q['text']}")
-        for w in self.options_frame.winfo_children():
+        # Очистить всё старое
+        for w in self.scrollable_frame.winfo_children():
             w.destroy()
-        self.selected_option.set(self.answers[self.current_question_index] if len(self.answers) > self.current_question_index else -1)
-        for idx, option in enumerate(q["options"]):
-            tk.Radiobutton(self.options_frame, text=option, variable=self.selected_option, value=idx, font=("Arial", 12)).pack(anchor="w")
+        self.all_dynamic_labels = []
 
-    def submit_answer(self):
+        q = self.questions[self.current_question_index]
+
+        # Вопрос (по центру)
+        q_label = tk.Label(
+            self.scrollable_frame, text=q['text'], font=("Arial", 14),
+            background="#f0f0f0", justify="center", anchor="center", wraplength=420
+        )
+        q_label.pack(pady=(10, 10), padx=10, anchor="center")
+        self.all_dynamic_labels.append(q_label)
+
+        # Варианты ответов (по левому краю, с отступом 20px)
+        self.selected_option.set(-1)
+        self.radio_buttons = []
+        for idx, option in enumerate(q["options"]):
+            rb_frame = tk.Frame(self.scrollable_frame, background="#f0f0f0")
+            rb_frame.pack(anchor="w", fill="x", padx=(20, 0), pady=2)
+            rb = tk.Radiobutton(
+                rb_frame,
+                text=option,
+                variable=self.selected_option,
+                value=idx,
+                font=("Arial", 12),
+                anchor="w",
+                wraplength=400,
+                justify="left",
+                background="#f0f0f0"
+            )
+            rb.pack(anchor="w", fill="x")
+            self.radio_buttons.append(rb)
+            self.all_dynamic_labels.append(rb)
+
+        # Кнопка: если последний вопрос — меняем на "Завершить тест"
+        if self.current_question_index == len(self.questions) - 1:
+            self.next_button.config(text="Завершить тест", command=self.finish_test)
+        else:
+            self.next_button.config(text="Следующий", command=self.next_question)
+
+        self.after(100, self.update_wraplength_now)
+        self.canvas.yview_moveto(0)
+
+    def next_question(self):
         sel = self.selected_option.get()
         if sel == -1:
-            messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.")
+            messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.", parent=self)
             return
-        if len(self.answers) > self.current_question_index:
-            self.answers[self.current_question_index] = sel
-        else:
-            self.answers.append(sel)
-        messagebox.showinfo("Ответ принят", "Ваш ответ сохранён.")
-
-    def navigate(self, step):
-        new_idx = self.current_question_index + step
-        if 0 <= new_idx < len(self.questions):
-            self.current_question_index = new_idx
-            self.load_question()
-        else:
-            messagebox.showinfo("Конец", "Дальше вопросов нет.")
+        self.answers.append(sel)
+        self.current_question_index += 1
+        self.load_question()
 
     def finish_test(self):
-        if len(self.answers) < len(self.questions):
-            if not messagebox.askyesno("Тест не завершён", "Вы не ответили на все вопросы. Завершить тест?"):
-                return
-        # Подсчёт правильных ответов
+        sel = self.selected_option.get()
+        if sel == -1:
+            messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.", parent=self)
+            return
+        self.answers.append(sel)
         score = sum(
             ans == q["correct_options"]
             for ans, q in zip(self.answers, self.questions)
         )
-        self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
-        messagebox.showinfo("Тест завершён", f"Ваш результат: {score} из {len(self.questions)}.")
+        self.db.save_test_results(self.user_id, self.theme_id, self.questions, self.answers, score)
+        messagebox.showinfo("Тест завершён", f"Ваш результат: {score} из {len(self.questions)}.", parent=self)
         self.destroy()
         self.parent.deiconify()
