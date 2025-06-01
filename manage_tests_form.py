@@ -32,9 +32,8 @@ class ManageTestsForm(tk.Toplevel):
         self.tests_listbox.delete(0, tk.END)
         self.tests = self.db.get_all_tests()
         for idx, (test_id, name, *rest) in enumerate(self.tests, 1):
-            # rest может содержать timer_seconds, если get_all_tests возвращает это поле
             timer = rest[0] if rest else None
-            timer_str = f" (таймер: {timer//60} мин)" if timer and timer > 0 else ""
+            timer_str = f" (Время выполнения: {timer//60} мин)" if timer and timer > 0 else ""
             self.tests_listbox.insert(tk.END, f"{idx}. {name}{timer_str}")
 
     def get_selected_test_id(self):

@@ -36,11 +36,14 @@ class TestSelectionForm(tk.Toplevel):
 
     def load_tests(self):
         group_id = self.db.get_user_group_id(self.user_id)
-        self.tests = self.db.get_all_tests(group_id=group_id)  # [(id, name), ...]
+        self.tests = self.db.get_all_tests(group_id=group_id)  # [(id, name, timer_seconds), ...]
         self.tests_listbox.delete(0, tk.END)
         if self.tests:
-            for _, test_name in self.tests:
-                self.tests_listbox.insert(tk.END, test_name)
+            for test in self.tests:
+                test_id, test_name = test[0], test[1]
+                timer = test[2] if len(test) > 2 else None
+                timer_str = f" (Время выполнения: {timer//60} мин)" if timer and timer > 0 else ""
+                self.tests_listbox.insert(tk.END, f"{test_name}{timer_str}")
         else:
             self.tests_listbox.insert(tk.END, "Нет доступных тестов")
             self.tests_listbox.config(state=tk.DISABLED)
@@ -50,7 +53,8 @@ class TestSelectionForm(tk.Toplevel):
         if not selection or not self.tests:
             return
         idx = selection[0]
-        test_id, test_name = self.tests[idx]
+        test = self.tests[idx]
+        test_id, test_name = test[0], test[1]
         self.withdraw()
         TestForm(self, self.user_id, test_id).mainloop()
         self.deiconify()
