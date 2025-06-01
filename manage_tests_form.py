@@ -31,8 +31,11 @@ class ManageTestsForm(tk.Toplevel):
     def load_tests(self):
         self.tests_listbox.delete(0, tk.END)
         self.tests = self.db.get_all_tests()
-        for idx, (_, name) in enumerate(self.tests, 1):
-            self.tests_listbox.insert(tk.END, f"{idx}. {name}")
+        for idx, (test_id, name, *rest) in enumerate(self.tests, 1):
+            # rest может содержать timer_seconds, если get_all_tests возвращает это поле
+            timer = rest[0] if rest else None
+            timer_str = f" (таймер: {timer//60} мин)" if timer and timer > 0 else ""
+            self.tests_listbox.insert(tk.END, f"{idx}. {name}{timer_str}")
 
     def get_selected_test_id(self):
         selected = self.tests_listbox.curselection()
@@ -57,12 +60,13 @@ class ManageTestsForm(tk.Toplevel):
         group_ids = [groups[i][0] for i in dlg.selected]
 
         try:
-            test_id = self.db.add_test(test_name)
+            # Добавляем тест без таймера по умолчанию
+            test_id = self.db.add_test(test_name, timer_seconds=None)
             self.db.add_test_groups(test_id, group_ids)
             self.load_tests()
             messagebox.showinfo("Успешно", f"Тест '{test_name}' успешно добавлен для выбранных групп.")
 
-            # Открыть окно редактирования теста (добавления вопросов)
+            # Открыть окно редактирования теста (добавления вопросов и настройки таймера)
             self.withdraw()  # скрыть главное окно, если нужно
             EditTestForm(self, test_id).mainloop()
         except ValueError as e:

@@ -3,8 +3,9 @@ import hashlib
 
 class Database:
     def __init__(self, db_path="database.db"):
-        self.conn = sqlite3.connect("database.db")
         self.db_path = db_path
+        self.conn = sqlite3.connect(self.db_path)
+        self.initialize()
 
     def _execute(self, query, params=(), fetch=False, many=False):
         with sqlite3.connect(self.db_path) as conn:
@@ -17,9 +18,14 @@ class Database:
                 return cursor.fetchall()
             conn.commit()
 
+    @staticmethod
+    def hash_password(password):
+        return hashlib.sha256(password.encode()).hexdigest() if password else None
+
     def initialize(self):
         self._create_tables()
         self._add_admin_user()
+        self._add_timer_column()
 
     def _create_tables(self):
         tables = [
@@ -85,31 +91,35 @@ class Database:
         except sqlite3.IntegrityError:
             pass
 
-    @staticmethod
-    def hash_password(password):
-        return hashlib.sha256(password.encode()).hexdigest() if password else None
+    def _add_timer_column(self):
+        res = self._execute("PRAGMA table_info(THEME)", fetch=True)
+        if not any(r[1] == "timer_seconds" for r in res):
+            self._execute("ALTER TABLE THEME ADD COLUMN timer_seconds INTEGER")
+
+    # --- Универсальные методы выборки ---
+    def fetch_one(self, query, params=()):
+        res = self._execute(query, params, fetch=True)
+        return res[0] if res else None
 
     # --- Пользователи ---
     def add_user(self, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
-        password_hash = self.hash_password(password) if password else None
-        query = "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        params = [username, password_hash, role, group_id, first_name, last_name, middle_name]
         try:
-            self._execute(query, tuple(params))
+            self._execute(
+                "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, self.hash_password(password), role, group_id, first_name, last_name, middle_name)
+            )
         except sqlite3.IntegrityError:
             raise ValueError("Пользователь с таким именем уже существует")
 
     def update_user(self, user_id, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
         fields = ["username=?", "role=?", "group_id=?", "first_name=?", "last_name=?", "middle_name=?"]
         params = [username, role, group_id, first_name, last_name, middle_name]
-        password_hash = self.hash_password(password) if password else None
-        if password_hash:
+        if password:
             fields.insert(1, "password=?")
-            params.insert(1, password_hash)
-        query = f"UPDATE USERS SET {', '.join(fields)} WHERE id=?"
+            params.insert(1, self.hash_password(password))
         params.append(user_id)
         try:
-            self._execute(query, tuple(params))
+            self._execute(f"UPDATE USERS SET {', '.join(fields)} WHERE id=?", tuple(params))
         except sqlite3.IntegrityError:
             raise ValueError("Пользователь с таким именем уже существует")
 
@@ -117,11 +127,10 @@ class Database:
         self._execute("DELETE FROM USERS WHERE id=?", (user_id,))
 
     def get_user_by_id(self, user_id):
-        result = self._execute(
+        return self.fetch_one(
             "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE id = ?",
-            (user_id,), fetch=True
+            (user_id,)
         )
-        return result[0] if result else None
 
     def get_users(self, group_id=None, role=None, exclude_main_admin=False):
         query = "SELECT id, username, first_name, last_name, middle_name, role FROM USERS WHERE 1=1"
@@ -152,22 +161,20 @@ class Database:
         )
 
     def get_main_admin(self):
-        result = self._execute("SELECT id, username, role FROM USERS WHERE role='admin' AND username='admin'", fetch=True)
-        return result[0] if result else None
+        return self.fetch_one("SELECT id, username, role FROM USERS WHERE role='admin' AND username='admin'")
 
     def check_admin_password(self, admin_id, password):
-        row = self._execute("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,), fetch=True)
-        return row and row[0][0] == self.hash_password(password)
+        row = self.fetch_one("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
+        return row and row[0] == self.hash_password(password)
 
     def update_admin_password(self, admin_id, new_password):
         self._execute("UPDATE USERS SET password=? WHERE id=? AND role='admin'", (self.hash_password(new_password), admin_id))
 
     def validate_user(self, username, password):
-        result = self._execute(
+        return self.fetch_one(
             "SELECT * FROM USERS WHERE username = ? AND password = ?",
-            (username, self.hash_password(password)), fetch=True
+            (username, self.hash_password(password))
         )
-        return result[0] if result else None
 
     # --- Группы ---
     def get_groups(self):
@@ -183,62 +190,61 @@ class Database:
         self._execute("DELETE FROM GROUPS WHERE id=?", (group_id,))
 
     def get_group_by_id(self, group_id):
-        result = self._execute("SELECT id, name, access_code FROM GROUPS WHERE id=?", (group_id,), fetch=True)
-        return result[0] if result else None
-    
+        return self.fetch_one("SELECT id, name, access_code FROM GROUPS WHERE id=?", (group_id,))
+
     def get_group_by_name(self, name):
-        result = self._execute(
-            "SELECT id, name, access_code FROM GROUPS WHERE name = ?", (name,), fetch=True
-        )
-        if result:
-            return {"id": result[0][0], "name": result[0][1], "access_code": result[0][2]}
+        row = self.fetch_one("SELECT id, name, access_code FROM GROUPS WHERE name = ?", (name,))
+        if row:
+            return {"id": row[0], "name": row[1], "access_code": row[2]}
         return None
-    
+
     def get_user_by_name_and_group(self, username, group_id):
-        result = self._execute(
+        row = self.fetch_one(
             "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE username = ? AND group_id = ?",
-            (username, group_id), fetch=True
+            (username, group_id)
         )
-        if result:
+        if row:
             return {
-                "id": result[0][0], "username": result[0][1], "role": result[0][2],
-                "group_id": result[0][3], "first_name": result[0][4],
-                "last_name": result[0][5], "middle_name": result[0][6]
+                "id": row[0], "username": row[1], "role": row[2],
+                "group_id": row[3], "first_name": row[4],
+                "last_name": row[5], "middle_name": row[6]
             }
         return None
-    
+
     def get_user_group_id(self, user_id):
-        result = self._execute(
-            "SELECT group_id FROM USERS WHERE id = ?", (user_id,), fetch=True
-        )
-        return result[0][0] if result and result[0][0] is not None else None
+        row = self.fetch_one("SELECT group_id FROM USERS WHERE id = ?", (user_id,))
+        return row[0] if row and row[0] is not None else None
 
     # --- Тесты и вопросы ---
     def get_all_tests(self, group_id=None):
-        if group_id is not None:
-            return self._execute("SELECT id, name FROM TESTS WHERE group_id=? OR group_id IS NULL", (group_id,), fetch=True)
-        else:
-            return self._execute("SELECT id, name FROM TESTS", fetch=True)
-        
-    def get_test_name(self, theme_id):
-        result = self._execute("SELECT name FROM THEME WHERE id=?", (theme_id,), fetch=True)
-        return result[0][0] if result else "Без названия"
-
-    def get_all_tests(self, group_id=None):
         if group_id is None:
-            return self._execute("SELECT id, name FROM THEME", fetch=True)
+            return self._execute("SELECT id, name, timer_seconds FROM THEME", fetch=True)
         else:
             return self._execute(
-                "SELECT t.id, t.name FROM THEME t "
+                "SELECT t.id, t.name, t.timer_seconds FROM THEME t "
                 "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
             )
 
-    def add_test(self, test_name):
+    def get_test_name(self, theme_id):
+        result = self._execute("SELECT name FROM THEME WHERE id=?", (theme_id,), fetch=True)
+        return result[0][0] if result else "Без названия"
+    
+    def get_theme(self, theme_id):
+        result = self._execute("SELECT id, name, timer_seconds FROM THEME WHERE id=?", (theme_id,), fetch=True)
+        return result[0] if result else None
+    
+    def add_test(self, test_name, timer_seconds=None):
         try:
-            self._execute("INSERT INTO THEME (name) VALUES (?)", (test_name,))
+            self._execute("INSERT INTO THEME (name, timer_seconds) VALUES (?, ?)", (test_name, timer_seconds))
             return self._execute("SELECT id FROM THEME WHERE name = ?", (test_name,), fetch=True)[0][0]
         except sqlite3.IntegrityError:
             raise ValueError("Тест с таким названием уже существует.")
+        
+    def update_test(self, test_id, test_name, timer_seconds=None):
+        self._execute("UPDATE THEME SET name=?, timer_seconds=? WHERE id=?", (test_name, timer_seconds, test_id))
+
+    def remove_test_timer(self, test_id):
+        self._execute("UPDATE THEME SET timer_seconds=NULL WHERE id=?", (test_id,))
 
     def add_test_groups(self, test_id, group_ids):
         self._execute(
@@ -263,23 +269,22 @@ class Database:
             GROUP BY q.id
         """
         rows = self._execute(query, (theme_id,), fetch=True)
-        questions = []
-        for row in rows:
-            options = row[4].split("|||") if row[4] else []
-            questions.append({
+        return [
+            {
                 "id": row[0],
                 "theme_local_number": row[1],
                 "text": row[2],
                 "correct_options": list(map(int, row[3].split(","))) if row[3] else [],
-                "options": options
-            })
-        return questions
+                "options": row[4].split("|||") if row[4] else []
+            }
+            for row in rows
+        ]
 
     def add_question(self, theme_id, text, options, correct_options):
-        theme_local_number = self._execute(
+        theme_local_number = self.fetch_one(
             "SELECT COALESCE(MAX(theme_local_number), 0) + 1 FROM QUESTION WHERE theme_id = ?",
-            (theme_id,), fetch=True
-        )[0][0]
+            (theme_id,)
+        )[0]
         cursor = self.conn.cursor()
         cursor.execute(
             "INSERT INTO QUESTION (theme_id, text, correct_options, theme_local_number) VALUES (?, ?, ?, ?)",
@@ -300,7 +305,7 @@ class Database:
         self._execute("DELETE FROM ANSWER WHERE question_id = ?", (question_id,))
         self._execute(
             "INSERT INTO ANSWER (question_id, text) VALUES (?, ?)",
-            [(question_id, options) for options in options],
+            [(question_id, option) for option in options],
             many=True
         )
 

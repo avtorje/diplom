@@ -9,13 +9,28 @@ class EditTestForm(tk.Toplevel):
         self.test_id = test_id
         self.parent = parent
         self.title("Редактирование теста")
-        self.geometry("500x400")
+        self.geometry("500x500")
         self.center_window()
         self.create_widgets()
+        self.load_test_timer()
         self.load_questions()
 
     def create_widgets(self):
         tk.Label(self, text="Редактирование теста", font=("Arial", 16)).pack(pady=10)
+
+        # --- Таймер теста ---
+        timer_frame = tk.Frame(self)
+        timer_frame.pack(pady=5)
+        tk.Label(timer_frame, text="Таймер (минут):").pack(side="left")
+        self.timer_var = tk.StringVar()
+        self.timer_entry = tk.Entry(timer_frame, textvariable=self.timer_var, width=6)
+        self.timer_entry.pack(side="left", padx=(0, 10))
+        self.timer_check = tk.IntVar()
+        self.timer_remove = tk.Checkbutton(timer_frame, text="Убрать таймер", variable=self.timer_check, command=self.toggle_timer)
+        self.timer_remove.pack(side="left")
+        tk.Button(timer_frame, text="Сохранить таймер", command=self.save_timer).pack(side="left", padx=5)
+
+        # --- Вопросы ---
         self.questions_listbox = tk.Listbox(self)
         self.questions_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
         actions = [
@@ -27,6 +42,45 @@ class EditTestForm(tk.Toplevel):
         ]
         for text, cmd in actions:
             tk.Button(self, text=text, command=cmd).pack(pady=5)
+
+    def load_test_timer(self):
+        theme = self.db.get_theme(self.test_id)
+        if theme:
+            timer_seconds = theme[2]
+            if timer_seconds and timer_seconds > 0:
+                self.timer_var.set(str(timer_seconds // 60))
+                self.timer_check.set(0)
+            else:
+                self.timer_var.set("")
+                self.timer_check.set(1)
+            self.toggle_timer()
+        else:
+            self.timer_var.set("")
+            self.timer_check.set(1)
+            self.toggle_timer()
+
+    def toggle_timer(self):
+        if self.timer_check.get():
+            self.timer_entry.configure(state='disabled')
+        else:
+            self.timer_entry.configure(state='normal')
+
+    def save_timer(self):
+        # Сохраняет таймер в БД
+        try:
+            timer_seconds = None
+            if not self.timer_check.get():
+                mins = self.timer_var.get()
+                if not mins.strip():
+                    raise ValueError
+                mins = int(mins)
+                if mins <= 0:
+                    raise ValueError
+                timer_seconds = mins * 60
+            self.db.update_test(self.test_id, self.db.get_test_name(self.test_id), timer_seconds)
+            messagebox.showinfo("Успешно", "Таймер теста сохранён.", parent=self)
+        except Exception:
+            messagebox.showerror("Ошибка", "Введите корректное значение таймера (целое число минут > 0) либо уберите таймер.", parent=self)
 
     def load_questions(self):
         self.questions = self.db.get_questions(self.test_id)

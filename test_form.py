@@ -8,103 +8,109 @@ class TestForm(tk.Toplevel):
         self.db = Database()
         self.user_id = user_id
         self.test_id = test_id
-        self.current_question_index = 0
-        self.answers = []
         self.questions = self.db.get_questions(test_id)
+        self.answers = []
+        self.current_question_index = 0
+        self.selected_option = tk.IntVar(value=-1)
+        self.all_dynamic_labels = []
+        self.parent = parent
+
+        self.theme = self.db.get_theme(test_id)
+        self.timer_seconds = self.theme[2] if self.theme and self.theme[2] else None
+        self.time_left = self.timer_seconds
+
         self.title(f"Тест - {self.db.get_test_name(test_id)}")
         self.geometry("500x400")
-        self.parent = parent
+        self.center_window()
 
         if not self.questions:
             messagebox.showinfo("Нет вопросов", "В этом тесте нет вопросов.")
             self.destroy()
             return
 
-        self.selected_option = tk.IntVar(value=-1)
-        self.all_dynamic_labels = []
-        self.create_widgets()
-        self.center_window()
-        self.after(100, self.load_question)
+        self._build_ui()
+        self.load_question()
+
+        if self.timer_seconds:
+            self.timer_label = tk.Label(self, text=self.format_time(self.time_left), font=("Arial", 14), bg="#f0f0f0")
+            self.timer_label.place(x=10, y=10)  # Левый верхний угол
+            self.update_timer()
+
+    def format_time(self, seconds):
+        minutes = seconds // 60
+        secs = seconds % 60
+        return f"Осталось: {minutes:02}:{secs:02}"
+
+    def update_timer(self):
+        if self.time_left > 0:
+            self.timer_label.config(text=self.format_time(self.time_left))
+            self.time_left -= 1
+            self.after(1000, self.update_timer)
+        else:
+            self.timer_label.config(text="Время вышло!")
+            self.finish_test_due_to_timeout()
+
+    def finish_test_due_to_timeout(self):
+        messagebox.showinfo("Тест завершён", "Время вышло! Тест завершён автоматически.", parent=self)
+        # Остальные неотвеченные вопросы считаются без ответа (или неверными)
+        self.answers += [-1] * (len(self.questions) - len(self.answers))
+        score = sum(ans == q["correct_options"] for ans, q in zip(self.answers, self.questions))
+        self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
+        self.destroy()
+        self.parent.deiconify()
 
     def center_window(self):
         self.update_idletasks()
-        width = self.winfo_width()
-        height = self.winfo_height()
-        if width <= 1 or height <= 1:
-            width, height = 500, 400
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        w, h = self.winfo_width(), self.winfo_height()
+        w, h = (500, 400) if w <= 1 or h <= 1 else (w, h)
+        x = (self.winfo_screenwidth() // 2) - (w // 2)
+        y = (self.winfo_screenheight() // 2) - (h // 2)
+        self.geometry(f"{w}x{h}+{x}+{y}")
 
-    def create_widgets(self):
-        # Scrollable area setup
+    def _build_ui(self):
         self.container = tk.Frame(self)
         self.container.pack(fill="both", expand=True)
-
         self.canvas = tk.Canvas(self.container, background="#f0f0f0", highlightthickness=0)
         self.vscroll = tk.Scrollbar(self.container, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.vscroll.set)
-
         self.vscroll.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
-
-        # Вложенный контейнер для скролла
         self.outer_frame = tk.Frame(self.canvas, background="#f0f0f0")
         self.canvas.create_window((0, 0), window=self.outer_frame, anchor="n", tags="inner")
-
         self.scrollable_frame = tk.Frame(self.outer_frame, background="#f0f0f0")
         self.scrollable_frame.pack(anchor="n", pady=20)
-
-        # Привязка прокрутки
         self.outer_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig("inner", width=e.width))
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-
-        # Кнопка "Следующий"/"Завершить тест" всегда видна внизу
-        self.next_button = tk.Button(self, text="Следующий", command=self.next_question)
+        self.canvas.bind_all("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        self.next_button = tk.Button(self, text="Следующий", command=self._on_next)
         self.next_button.pack(pady=10, side="bottom")
+        self.bind("<Configure>", lambda e: self.after(100, self._update_wraplength))
 
-        # Для wraplength
-        self.resize_after_id = None
-        self.bind("<Configure>", self.update_wraplength_delayed)
-
-    def _on_mousewheel(self, event):
-        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-
-    def update_wraplength_now(self, event=None):
-        new_width = self.canvas.winfo_width()
-        if new_width <= 1:
-            self.after(100, self.update_wraplength_now)
-            return
-        new_width -= 120  # отступ для scrollbar и кружка
+    def _update_wraplength(self):
+        width = self.canvas.winfo_width() - 120
         for lbl in self.all_dynamic_labels:
-            lbl.config(wraplength=new_width)
-
-    def update_wraplength_delayed(self, event):
-        if self.resize_after_id:
-            self.after_cancel(self.resize_after_id)
-        self.resize_after_id = self.after(100, self.update_wraplength_now)
+            lbl.config(wraplength=width if width > 0 else 360)
 
     def load_question(self):
-        # Очистить старое
         for w in self.scrollable_frame.winfo_children():
             w.destroy()
-        self.all_dynamic_labels = []
-
+        self.all_dynamic_labels.clear()
         q = self.questions[self.current_question_index]
-
-        # ВОПРОС по центру
+        # ВОПРОС — по центру
         q_label = tk.Label(
-            self.scrollable_frame, text=q['text'], font=("Arial", 14),
-            background="#f0f0f0", justify="center", anchor="center", wraplength=420
+            self.scrollable_frame,
+            text=q['text'],
+            font=("Arial", 14),
+            background="#f0f0f0",
+            justify="center",
+            anchor="center",
+            wraplength=420
         )
         q_label.pack(pady=(10, 10), padx=10, anchor="center")
         self.all_dynamic_labels.append(q_label)
 
-        # ОТВЕТЫ по grid: кружок в первом столбце, текст во втором, с одинаковым отступом
+        # ОТВЕТЫ — по левому краю с отступом
         self.selected_option.set(-1)
-        self.radio_buttons = []
-
         answers_frame = tk.Frame(self.scrollable_frame, background="#f0f0f0")
         answers_frame.pack(fill="x", padx=(20, 0), anchor="w")
 
@@ -116,8 +122,7 @@ class TestForm(tk.Toplevel):
                 background="#f0f0f0",
                 highlightthickness=0
             )
-            rb.grid(row=idx, column=0, sticky="nw", padx=(0, 5), pady=2)
-
+            rb.grid(row=idx, column=0, sticky="w", padx=(0, 5), pady=2)
             lbl = tk.Label(
                 answers_frame,
                 text=option,
@@ -127,38 +132,33 @@ class TestForm(tk.Toplevel):
                 anchor="w",
                 wraplength=360
             )
-            lbl.grid(row=idx, column=1, sticky="nw", pady=2)
-            self.radio_buttons.append(rb)
+            lbl.grid(row=idx, column=1, sticky="w", pady=2)
             self.all_dynamic_labels.append(lbl)
 
-        # Обновление текста на кнопке
-        if self.current_question_index == len(self.questions) - 1:
-            self.next_button.config(text="Завершить тест", command=self.finish_test)
-        else:
-            self.next_button.config(text="Следующий", command=self.next_question)
-
-        self.after(100, self.update_wraplength_now)
+        is_last = self.current_question_index == len(self.questions) - 1
+        self.next_button.config(
+            text="Завершить тест" if is_last else "Следующий",
+            command=self._on_finish if is_last else self._on_next
+        )
+        self.after(100, self._update_wraplength)
         self.canvas.yview_moveto(0)
 
-    def next_question(self):
+    def _on_next(self):
         sel = self.selected_option.get()
         if sel == -1:
             messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.", parent=self)
             return
         self.answers.append(sel)
         self.current_question_index += 1
-        self.after(100, self.load_question)
+        self.load_question()
 
-    def finish_test(self):
+    def _on_finish(self):
         sel = self.selected_option.get()
         if sel == -1:
             messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.", parent=self)
             return
         self.answers.append(sel)
-        score = sum(
-            ans == q["correct_options"]
-            for ans, q in zip(self.answers, self.questions)
-        )
+        score = sum(ans == q["correct_options"] for ans, q in zip(self.answers, self.questions))
         self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
         messagebox.showinfo("Тест завершён", f"Ваш результат: {score} из {len(self.questions)}.", parent=self)
         self.destroy()
