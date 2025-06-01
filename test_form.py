@@ -76,10 +76,9 @@ class TestForm(tk.Toplevel):
         if new_width <= 1:
             self.after(100, self.update_wraplength_now)
             return
-        new_width -= 40
+        new_width -= 120  # отступ для scrollbar и кружка
         for lbl in self.all_dynamic_labels:
             lbl.config(wraplength=new_width)
-
 
     def update_wraplength_delayed(self, event):
         if self.resize_after_id:
@@ -96,49 +95,50 @@ class TestForm(tk.Toplevel):
 
         # ВОПРОС по центру
         q_label = tk.Label(
-            self.scrollable_frame,
-            text=q['text'],
-            font=("Arial", 14),
-            background="#f0f0f0",
-            wraplength=420,
-            anchor="center",
-            justify="left"  # или убери justify вовсе
+            self.scrollable_frame, text=q['text'], font=("Arial", 14),
+            background="#f0f0f0", justify="center", anchor="center", wraplength=420
         )
-
         q_label.pack(pady=(10, 10), padx=10, anchor="center")
         self.all_dynamic_labels.append(q_label)
 
-        # ОТВЕТЫ по левому краю с отступом 20px
+        # ОТВЕТЫ по grid: кружок в первом столбце, текст во втором, с одинаковым отступом
         self.selected_option.set(-1)
         self.radio_buttons = []
+
+        answers_frame = tk.Frame(self.scrollable_frame, background="#f0f0f0")
+        answers_frame.pack(fill="x", padx=(20, 0), anchor="w")
+
         for idx, option in enumerate(q["options"]):
-            rb_frame = tk.Frame(self.scrollable_frame, background="#f0f0f0")
-            rb_frame.pack(anchor="w", fill="x", padx=(20, 0), pady=2)
             rb = tk.Radiobutton(
-                rb_frame,
-                text=option,
+                answers_frame,
                 variable=self.selected_option,
                 value=idx,
-                font=("Arial", 12),
-                anchor="w",
-                wraplength=400,
-                justify="left",
-                background="#f0f0f0"
+                background="#f0f0f0",
+                highlightthickness=0
             )
-            rb.pack(anchor="w", fill="x")
-            self.radio_buttons.append(rb)
-            self.all_dynamic_labels.append(rb)
+            rb.grid(row=idx, column=0, sticky="nw", padx=(0, 5), pady=2)
 
-        # Переключение между "Следующий" и "Завершить тест"
+            lbl = tk.Label(
+                answers_frame,
+                text=option,
+                font=("Arial", 12),
+                background="#f0f0f0",
+                justify="left",
+                anchor="w",
+                wraplength=360
+            )
+            lbl.grid(row=idx, column=1, sticky="nw", pady=2)
+            self.radio_buttons.append(rb)
+            self.all_dynamic_labels.append(lbl)
+
+        # Обновление текста на кнопке
         if self.current_question_index == len(self.questions) - 1:
             self.next_button.config(text="Завершить тест", command=self.finish_test)
         else:
             self.next_button.config(text="Следующий", command=self.next_question)
 
-        # 💡 ДОБАВЛЕНО — обновляем wraplength явно
-        self.update_wraplength_now()
-
-
+        self.after(100, self.update_wraplength_now)
+        self.canvas.yview_moveto(0)
 
     def next_question(self):
         sel = self.selected_option.get()
