@@ -9,16 +9,32 @@ class Database:
         self.initialize()
 
     def _execute(self, query, params=(), fetch=False, many=False):
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            if many:
-                cursor.executemany(query, params)
-            else:
-                cursor.execute(query, params)
-            if fetch:
-                return cursor.fetchall()
-            conn.commit()
+        cur = self.conn.cursor()
+        if many:
+            cur.executemany(query, params)
+        else:
+            cur.execute(query, params)
+        if fetch:
+            return cur.fetchall()
+        self.conn.commit()
+        return cur
 
+    def get_unpassed_tests_for_user(self, user_id, group_id):
+        """
+        Получить все тесты группы, которые не были пройдены данным пользователем.
+        """
+        # Используем структуру THEME, THEME_GROUP и TEST_SUMMARY
+        query = """
+        SELECT t.id, t.name, t.timer_seconds
+        FROM THEME t
+        JOIN THEME_GROUP tg ON tg.theme_id = t.id
+        WHERE tg.group_id = ?
+        AND t.id NOT IN (
+            SELECT ts.theme_id FROM TEST_SUMMARY ts WHERE ts.user_id = ?
+        )
+        """
+        return self._execute(query, (group_id, user_id), fetch=True)
+    
     @staticmethod
     def hash_password(password):
         return hashlib.sha256(password.encode()).hexdigest() if password else None

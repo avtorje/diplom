@@ -37,7 +37,8 @@ class TestSelectionForm(tk.Toplevel):
 
     def load_tests(self):
         group_id = self.db.get_user_group_id(self.user_id)
-        self.tests = self.db.get_all_tests(group_id=group_id)  # [(id, name, timer_seconds), ...]
+        # Теперь получаем только не пройденные тесты:
+        self.tests = self.db.get_unpassed_tests_for_user(self.user_id, group_id)  # [(id, name, timer_seconds), ...]
         self.tests_listbox.delete(0, tk.END)
         if self.tests:
             for test in self.tests:
@@ -45,6 +46,7 @@ class TestSelectionForm(tk.Toplevel):
                 timer = test[2] if len(test) > 2 else None
                 timer_str = f" (Время выполнения: {timer//60} мин)" if timer and timer > 0 else ""
                 self.tests_listbox.insert(tk.END, f"{test_name}{timer_str}")
+            self.tests_listbox.config(state=tk.NORMAL)
         else:
             self.tests_listbox.insert(tk.END, "Нет доступных тестов")
             self.tests_listbox.config(state=tk.DISABLED)
