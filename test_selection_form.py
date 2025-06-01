@@ -10,7 +10,7 @@ class TestSelectionForm(tk.Toplevel):
         self.user_id = user_id
         self.student_form = student_form
         self.title("Выбор теста")
-        self.geometry("400x300")
+        self.geometry("400x400")
         self.resizable(False, False)
         self.center_window()
 
