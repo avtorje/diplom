@@ -40,7 +40,7 @@ class ManageUsersForm(tk.Toplevel):
         self.main_admin_listbox.delete(0, tk.END)
         main_admin = self.db.get_main_admin()
         if main_admin:
-            self.main_admin_listbox.insert(tk.END, f"{main_admin[1]} (Главный админ)")
+            self.main_admin_listbox.insert(tk.END, f"{main_admin['username']} (Главный админ)")
 
         self.groups_listbox.delete(0, tk.END)
         self.groups = self.db.get_groups()
