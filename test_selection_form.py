@@ -59,7 +59,6 @@ class TestSelectionForm(tk.Toplevel):
         self.withdraw()
         from test_form import TestForm
         TestForm(self, self.user_id, test_id, self.student_form).mainloop()
-        self.deiconify()
 
     def go_back(self):
         self.destroy()

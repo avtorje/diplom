@@ -46,7 +46,6 @@ class StudentForm(tk.Toplevel):
         self.withdraw()
         from test_selection_form import TestSelectionForm
         TestSelectionForm(self, self.user_id, student_form=self).mainloop()
-        self.deiconify()
 
     def open_journal(self):
         self.withdraw()
