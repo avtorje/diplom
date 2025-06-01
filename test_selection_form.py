@@ -4,10 +4,11 @@ from database import Database
 from test_form import TestForm
 
 class TestSelectionForm(tk.Toplevel):
-    def __init__(self, parent, user_id):
+    def __init__(self, parent, user_id, student_form):
         super().__init__(parent)
         self.db = Database()
         self.user_id = user_id
+        self.student_form = student_form
         self.title("Выбор теста")
         self.geometry("400x300")
         self.resizable(False, False)
@@ -56,7 +57,8 @@ class TestSelectionForm(tk.Toplevel):
         test = self.tests[idx]
         test_id, test_name = test[0], test[1]
         self.withdraw()
-        TestForm(self, self.user_id, test_id).mainloop()
+        from test_form import TestForm
+        TestForm(self, self.user_id, test_id, self.student_form).mainloop()
         self.deiconify()
 
     def go_back(self):

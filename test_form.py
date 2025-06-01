@@ -5,7 +5,7 @@ from database import Database
 from test_result_window import TestResultWindow
 
 class TestForm(tk.Toplevel):
-    def __init__(self, parent, user_id, test_id):
+    def __init__(self, parent, user_id, test_id, student_form):
         super().__init__(parent)
         self.db = Database()
         self.user_id = user_id
@@ -17,6 +17,7 @@ class TestForm(tk.Toplevel):
         self.all_dynamic_labels = []
         self.parent = parent
         self.start_time = time.time()
+        self.student_form = student_form
 
         # Таймер и тема (оставляем как есть)
         self.theme = self.db.get_theme(test_id)
@@ -152,9 +153,9 @@ class TestForm(tk.Toplevel):
         self.show_result_window(total_time if self.timer_seconds else None, percent)
 
     def show_result_window(self, time_seconds, percent):
-        def back_to_main():
-            self.destroy()
-            self.parent.deiconify()
-        # Показываем окно результата
-        TestResultWindow(self.parent, time_seconds=time_seconds, percent=percent, back_callback=back_to_main)
-        self.withdraw()
+        def back_to_student():
+            self.destroy()  # Закрыть окно теста
+            self.student_form.deiconify()  # Показать панель студента
+        from test_result_window import TestResultWindow
+        TestResultWindow(self, time_seconds=time_seconds, percent=percent, back_callback=back_to_student)
+        self.withdraw()  # Скрыть форму теста на время показа результатов

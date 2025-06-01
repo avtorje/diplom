@@ -8,9 +8,13 @@ class TestResultWindow(tk.Toplevel):
         self.resizable(False, False)
         self.configure(bg="#f0f0f0")
         self.grab_set()
-        self.center_window()
 
-        self.back_callback = back_callback  # Сохраняем колбэк
+        self.lift()  # Поднять окно над остальными
+        self.attributes('-topmost', True)  # Сделать окно поверх всех
+
+        self.center_window()  # <--- ВЫЗЫВАТЬ ПОСЛЕ lift() и attributes()
+
+        self.back_callback = back_callback  # Сохраняем колбэк для возврата
 
         # Заголовок по центру
         label_title = tk.Label(self, text="Тест завершён!", font=("Arial", 16, "bold"),
@@ -27,15 +31,14 @@ class TestResultWindow(tk.Toplevel):
         label_score = tk.Label(self, text=f"Результат: {percent:.0f}%", font=("Arial", 13), bg="#f0f0f0")
         label_score.pack(pady=(0, 28))
 
-        # Кнопка теперь вызывает _on_back, а не внешний колбэк напрямую!
         btn = tk.Button(self, text="Вернуться на главную", font=("Arial", 12), width=20,
                         command=self._on_back)
         btn.pack(pady=0)
 
     def _on_back(self):
-        self.destroy()  # Сначала закрыть окно результатов
+        self.destroy()  # Закрыть окно результатов
         if self.back_callback:
-            self.back_callback()  # Затем выполнить возвращение на главную/панель студента
+            self.back_callback()  # Вернуть на панель студента
 
     def center_window(self):
         self.update_idletasks()
