@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
+import time
 from database import Database
+from test_result_window import TestResultWindow
 
 class TestForm(tk.Toplevel):
     def __init__(self, parent, user_id, test_id):
@@ -14,6 +16,7 @@ class TestForm(tk.Toplevel):
         self.selected_option = tk.IntVar(value=-1)
         self.all_dynamic_labels = []
         self.parent = parent
+        self.start_time = time.time()
 
         # Таймер и тема (оставляем как есть)
         self.theme = self.db.get_theme(test_id)
@@ -34,7 +37,7 @@ class TestForm(tk.Toplevel):
 
         if self.timer_seconds:
             self.timer_label = tk.Label(self, text=self.format_time(self.time_left), font=("Arial", 14), bg="#f0f0f0")
-            self.timer_label.place(x=10, y=10)  # Левый верхний угол
+            self.timer_label.place(x=10, y=10)
             self.update_timer()
 
     def format_time(self, seconds):
@@ -52,13 +55,13 @@ class TestForm(tk.Toplevel):
             self.finish_test_due_to_timeout()
 
     def finish_test_due_to_timeout(self):
-        messagebox.showinfo("Тест завершён", "Время вышло! Тест завершён автоматически.", parent=self)
-        # Остальные неотвеченные вопросы считаются без ответа (или неверными)
+        # Остальные неотвеченные вопросы считаются без ответа
         self.answers += [-1] * (len(self.questions) - len(self.answers))
         score = sum(ans == q["correct_options"] for ans, q in zip(self.answers, self.questions))
         self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
-        self.destroy()
-        self.parent.deiconify()
+        percent = (score / len(self.questions)) * 100 if self.questions else 0
+        total_time = self.timer_seconds
+        self.show_result_window(total_time, percent)
 
     def center_window(self):
         self.update_idletasks()
@@ -140,6 +143,18 @@ class TestForm(tk.Toplevel):
         self.answers.append(sel)
         score = sum(ans == q["correct_options"] for ans, q in zip(self.answers, self.questions))
         self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
-        messagebox.showinfo("Тест завершён", f"Ваш результат: {score} из {len(self.questions)}.", parent=self)
-        self.destroy()
-        self.parent.deiconify()
+        percent = (score / len(self.questions)) * 100 if self.questions else 0
+        # Время прохождения теста
+        if self.timer_seconds:
+            total_time = self.timer_seconds - self.time_left
+        else:
+            total_time = int(time.time() - self.start_time)
+        self.show_result_window(total_time if self.timer_seconds else None, percent)
+
+    def show_result_window(self, time_seconds, percent):
+        def back_to_main():
+            self.destroy()
+            self.parent.deiconify()
+        # Показываем окно результата
+        TestResultWindow(self.parent, time_seconds=time_seconds, percent=percent, back_callback=back_to_main)
+        self.withdraw()

@@ -1,5 +1,6 @@
 import sqlite3
 import hashlib
+import datetime
 
 class Database:
     def __init__(self, db_path="database.db"):
@@ -26,6 +27,7 @@ class Database:
         self._create_tables()
         self._add_admin_user()
         self._add_timer_column()
+        self._add_answers_column_to_test_summary()
 
     def _create_tables(self):
         tables = [
@@ -82,6 +84,17 @@ class Database:
         for table in tables:
             self._execute(table)
 
+    def initialize(self):
+        self._create_tables()
+        self._add_admin_user()
+        self._add_timer_column()
+        self._add_answers_column_to_test_summary()
+
+    def _add_answers_column_to_test_summary(self):
+        res = self._execute("PRAGMA table_info(TEST_SUMMARY)", fetch=True)
+        if not any(r[1] == "answers" for r in res):
+            self._execute("ALTER TABLE TEST_SUMMARY ADD COLUMN answers TEXT")
+
     def _add_admin_user(self):
         try:
             self._execute(
@@ -95,6 +108,12 @@ class Database:
         res = self._execute("PRAGMA table_info(THEME)", fetch=True)
         if not any(r[1] == "timer_seconds" for r in res):
             self._execute("ALTER TABLE THEME ADD COLUMN timer_seconds INTEGER")
+    
+    def _add_answers_column_to_test_summary(self):
+        # Добавляем поле answers, если его нет в TEST_SUMMARY
+        res = self._execute("PRAGMA table_info(TEST_SUMMARY)", fetch=True)
+        if not any(r[1] == "answers" for r in res):
+            self._execute("ALTER TABLE TEST_SUMMARY ADD COLUMN answers TEXT")
 
     # --- Универсальные методы выборки ---
     def fetch_one(self, query, params=()):
@@ -226,6 +245,7 @@ class Database:
             )
 
     def get_test_name(self, theme_id):
+        
         result = self._execute("SELECT name FROM THEME WHERE id=?", (theme_id,), fetch=True)
         return result[0][0] if result else "Без названия"
     
@@ -251,6 +271,16 @@ class Database:
             "INSERT INTO THEME_GROUP (theme_id, group_id) VALUES (?, ?)",
             [(test_id, gid) for gid in group_ids],
             many=True
+        )
+
+    def save_test_results(self, user_id, test_id, questions, answers, score):
+        """
+        Сохраняет результат теста пользователя в таблицу TEST_SUMMARY.
+        """
+        date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._execute(
+            "INSERT INTO TEST_SUMMARY (user_id, theme_id, score, date, answers) VALUES (?, ?, ?, ?, ?)",
+            (user_id, test_id, score, date_str, str(answers))
         )
 
     def delete_test(self, test_id):
