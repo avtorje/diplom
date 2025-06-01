@@ -3,11 +3,12 @@ import hashlib
 import datetime
 
 class Database:
-    def __init__(self, db_path="database.db"):
+    def __init__(self, db_path: str = "database.db"):
         self.db_path = db_path
         self.conn = sqlite3.connect(self.db_path)
         self.initialize()
 
+    # --- Вспомогательные методы ---
     def _execute(self, query, params=(), fetch=False, many=False):
         cur = self.conn.cursor()
         if many:
@@ -19,31 +20,26 @@ class Database:
         self.conn.commit()
         return cur
 
-    def get_unpassed_tests_for_user(self, user_id, group_id):
-        """
-        Получить все тесты группы, которые не были пройдены данным пользователем.
-        """
-        # Используем структуру THEME, THEME_GROUP и TEST_SUMMARY
-        query = """
-        SELECT t.id, t.name, t.timer_seconds
-        FROM THEME t
-        JOIN THEME_GROUP tg ON tg.theme_id = t.id
-        WHERE tg.group_id = ?
-        AND t.id NOT IN (
-            SELECT ts.theme_id FROM TEST_SUMMARY ts WHERE ts.user_id = ?
-        )
-        """
-        return self._execute(query, (group_id, user_id), fetch=True)
-    
+    def fetch_one(self, query, params=()):
+        res = self._execute(query, params, fetch=True)
+        return res[0] if res else None
+
+    def _column_exists(self, table, column):
+        return any(r[1] == column for r in self._execute(f"PRAGMA table_info({table})", fetch=True))
+
     @staticmethod
     def hash_password(password):
         return hashlib.sha256(password.encode()).hexdigest() if password else None
 
+    # --- Инициализация и создание таблиц ---
     def initialize(self):
         self._create_tables()
-        self._add_admin_user()
-        self._add_timer_column()
-        self._add_answers_column_to_test_summary()
+        if not self.fetch_one("SELECT 1 FROM USERS WHERE username='admin'"):
+            self.add_user("admin", "admin123", "admin", first_name="Admin", last_name="User")
+        if not self._column_exists("THEME", "timer_seconds"):
+            self._execute("ALTER TABLE THEME ADD COLUMN timer_seconds INTEGER")
+        if not self._column_exists("TEST_SUMMARY", "answers"):
+            self._execute("ALTER TABLE TEST_SUMMARY ADD COLUMN answers TEXT")
 
     def _create_tables(self):
         tables = [
@@ -93,48 +89,13 @@ class Database:
                 theme_id INTEGER,
                 score INTEGER,
                 date TEXT,
+                answers TEXT,
                 FOREIGN KEY (user_id) REFERENCES USERS(id),
                 FOREIGN KEY (theme_id) REFERENCES THEME(id)
             )"""
         ]
         for table in tables:
             self._execute(table)
-
-    def initialize(self):
-        self._create_tables()
-        self._add_admin_user()
-        self._add_timer_column()
-        self._add_answers_column_to_test_summary()
-
-    def _add_answers_column_to_test_summary(self):
-        res = self._execute("PRAGMA table_info(TEST_SUMMARY)", fetch=True)
-        if not any(r[1] == "answers" for r in res):
-            self._execute("ALTER TABLE TEST_SUMMARY ADD COLUMN answers TEXT")
-
-    def _add_admin_user(self):
-        try:
-            self._execute(
-                "INSERT INTO USERS (username, password, role, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?)",
-                ("admin", self.hash_password("admin123"), "admin", "Admin", "User", "")
-            )
-        except sqlite3.IntegrityError:
-            pass
-
-    def _add_timer_column(self):
-        res = self._execute("PRAGMA table_info(THEME)", fetch=True)
-        if not any(r[1] == "timer_seconds" for r in res):
-            self._execute("ALTER TABLE THEME ADD COLUMN timer_seconds INTEGER")
-    
-    def _add_answers_column_to_test_summary(self):
-        # Добавляем поле answers, если его нет в TEST_SUMMARY
-        res = self._execute("PRAGMA table_info(TEST_SUMMARY)", fetch=True)
-        if not any(r[1] == "answers" for r in res):
-            self._execute("ALTER TABLE TEST_SUMMARY ADD COLUMN answers TEXT")
-
-    # --- Универсальные методы выборки ---
-    def fetch_one(self, query, params=()):
-        res = self._execute(query, params, fetch=True)
-        return res[0] if res else None
 
     # --- Пользователи ---
     def add_user(self, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
@@ -161,11 +122,12 @@ class Database:
     def delete_user(self, user_id):
         self._execute("DELETE FROM USERS WHERE id=?", (user_id,))
 
-    def get_user_by_id(self, user_id):
-        return self.fetch_one(
-            "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE id = ?",
-            (user_id,)
-        )
+    def get_user(self, **kwargs):
+        if not kwargs:
+            return None
+        query = "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE " + \
+                " AND ".join(f"{k}=?" for k in kwargs)
+        return self.fetch_one(query, tuple(kwargs.values()))
 
     def get_users(self, group_id=None, role=None, exclude_main_admin=False):
         query = "SELECT id, username, first_name, last_name, middle_name, role FROM USERS WHERE 1=1"
@@ -177,26 +139,8 @@ class Database:
             query += " AND role=?"
             params.append(role)
         if exclude_main_admin:
-            main_admin = self.get_main_admin()
-            if main_admin:
-                query += " AND id != ?"
-                params.append(main_admin[0])
+            query += " AND NOT (role='admin' AND username='admin')"
         return self._execute(query, tuple(params), fetch=True)
-
-    def get_admins_by_group(self, group_id):
-        return self._execute(
-            "SELECT id, username, role FROM USERS WHERE role='admin' AND username != 'admin' AND group_id = ?",
-            (group_id,), fetch=True
-        )
-
-    def get_students_by_group(self, group_id):
-        return self._execute(
-            "SELECT id, username, role FROM USERS WHERE role='student' AND group_id = ?",
-            (group_id,), fetch=True
-        )
-
-    def get_main_admin(self):
-        return self.fetch_one("SELECT id, username, role FROM USERS WHERE role='admin' AND username='admin'")
 
     def check_admin_password(self, admin_id, password):
         row = self.fetch_one("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
@@ -211,6 +155,12 @@ class Database:
             (username, self.hash_password(password))
         )
 
+    def get_main_admin(self):
+        row = self.fetch_one("SELECT id, username, first_name, last_name, middle_name FROM USERS WHERE username='admin' AND role='admin'")
+        if row:
+            return dict(zip(["id", "username", "first_name", "last_name", "middle_name"], row))
+        return None
+
     # --- Группы ---
     def get_groups(self):
         return self._execute("SELECT id, name FROM GROUPS ORDER BY id ASC", fetch=True)
@@ -224,58 +174,38 @@ class Database:
     def delete_group(self, group_id):
         self._execute("DELETE FROM GROUPS WHERE id=?", (group_id,))
 
-    def get_group_by_id(self, group_id):
-        return self.fetch_one("SELECT id, name, access_code FROM GROUPS WHERE id=?", (group_id,))
-
-    def get_group_by_name(self, name):
-        row = self.fetch_one("SELECT id, name, access_code FROM GROUPS WHERE name = ?", (name,))
+    def get_group(self, **kwargs):
+        if not kwargs:
+            return None
+        query = "SELECT id, name, access_code FROM GROUPS WHERE " + " AND ".join(f"{k}=?" for k in kwargs)
+        row = self.fetch_one(query, tuple(kwargs.values()))
         if row:
             return {"id": row[0], "name": row[1], "access_code": row[2]}
         return None
 
-    def get_user_by_name_and_group(self, username, group_id):
-        row = self.fetch_one(
-            "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE username = ? AND group_id = ?",
-            (username, group_id)
-        )
-        if row:
-            return {
-                "id": row[0], "username": row[1], "role": row[2],
-                "group_id": row[3], "first_name": row[4],
-                "last_name": row[5], "middle_name": row[6]
-            }
-        return None
-
-    def get_user_group_id(self, user_id):
-        row = self.fetch_one("SELECT group_id FROM USERS WHERE id = ?", (user_id,))
-        return row[0] if row and row[0] is not None else None
-
-    # --- Тесты и вопросы ---
+    # --- Тесты ---
     def get_all_tests(self, group_id=None):
         if group_id is None:
             return self._execute("SELECT id, name, timer_seconds FROM THEME", fetch=True)
-        else:
-            return self._execute(
-                "SELECT t.id, t.name, t.timer_seconds FROM THEME t "
-                "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
-            )
+        return self._execute(
+            "SELECT t.id, t.name, t.timer_seconds FROM THEME t "
+            "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
+        )
 
     def get_test_name(self, theme_id):
-        
-        result = self._execute("SELECT name FROM THEME WHERE id=?", (theme_id,), fetch=True)
-        return result[0][0] if result else "Без названия"
-    
+        result = self.fetch_one("SELECT name FROM THEME WHERE id=?", (theme_id,))
+        return result[0] if result else "Без названия"
+
     def get_theme(self, theme_id):
-        result = self._execute("SELECT id, name, timer_seconds FROM THEME WHERE id=?", (theme_id,), fetch=True)
-        return result[0] if result else None
-    
+        return self.fetch_one("SELECT id, name, timer_seconds FROM THEME WHERE id=?", (theme_id,))
+
     def add_test(self, test_name, timer_seconds=None):
         try:
             self._execute("INSERT INTO THEME (name, timer_seconds) VALUES (?, ?)", (test_name, timer_seconds))
-            return self._execute("SELECT id FROM THEME WHERE name = ?", (test_name,), fetch=True)[0][0]
+            return self.fetch_one("SELECT id FROM THEME WHERE name = ?", (test_name,))[0]
         except sqlite3.IntegrityError:
             raise ValueError("Тест с таким названием уже существует.")
-        
+
     def update_test(self, test_id, test_name, timer_seconds=None):
         self._execute("UPDATE THEME SET name=?, timer_seconds=? WHERE id=?", (test_name, timer_seconds, test_id))
 
@@ -289,16 +219,6 @@ class Database:
             many=True
         )
 
-    def save_test_results(self, user_id, test_id, questions, answers, score):
-        """
-        Сохраняет результат теста пользователя в таблицу TEST_SUMMARY.
-        """
-        date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self._execute(
-            "INSERT INTO TEST_SUMMARY (user_id, theme_id, score, date, answers) VALUES (?, ?, ?, ?, ?)",
-            (user_id, test_id, score, date_str, str(answers))
-        )
-
     def delete_test(self, test_id):
         question_ids = self._execute("SELECT id FROM QUESTION WHERE theme_id = ?", (test_id,), fetch=True)
         if question_ids:
@@ -306,6 +226,7 @@ class Database:
         self._execute("DELETE FROM QUESTION WHERE theme_id = ?", (test_id,))
         self._execute("DELETE FROM THEME WHERE id = ?", (test_id,))
 
+    # --- Вопросы ---
     def get_questions(self, theme_id):
         query = """
             SELECT q.id, q.theme_local_number, q.text, q.correct_options, GROUP_CONCAT(a.text, '|||')
@@ -327,23 +248,27 @@ class Database:
         ]
 
     def add_question(self, theme_id, text, options, correct_options):
+        if not options:
+            raise ValueError("Нельзя добавить вопрос без вариантов ответа.")
         theme_local_number = self.fetch_one(
             "SELECT COALESCE(MAX(theme_local_number), 0) + 1 FROM QUESTION WHERE theme_id = ?",
             (theme_id,)
         )[0]
-        cursor = self.conn.cursor()
-        cursor.execute(
+        cur = self.conn.cursor()
+        cur.execute(
             "INSERT INTO QUESTION (theme_id, text, correct_options, theme_local_number) VALUES (?, ?, ?, ?)",
             (theme_id, text, ",".join(map(str, correct_options)), theme_local_number)
         )
-        question_id = cursor.lastrowid
-        cursor.executemany(
+        question_id = cur.lastrowid
+        cur.executemany(
             "INSERT INTO ANSWER (question_id, text) VALUES (?, ?)",
             [(question_id, option) for option in options]
         )
         self.conn.commit()
 
     def update_question(self, question_id, text, options, correct_options):
+        if not options:
+            raise ValueError("Нельзя обновить вопрос без вариантов ответа.")
         self._execute(
             "UPDATE QUESTION SET text = ?, correct_options = ? WHERE id = ?",
             (text, ",".join(map(str, correct_options)), question_id)
@@ -361,3 +286,23 @@ class Database:
 
     def update_theme_local_number(self, question_id, new_number):
         self._execute("UPDATE QUESTION SET theme_local_number = ? WHERE id = ?", (new_number, question_id))
+
+    # --- Результаты тестов ---
+    def save_test_results(self, user_id, test_id, questions, answers, score):
+        date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._execute(
+            "INSERT INTO TEST_SUMMARY (user_id, theme_id, score, date, answers) VALUES (?, ?, ?, ?, ?)",
+            (user_id, test_id, score, date_str, str(answers))
+        )
+
+    def get_unpassed_tests_for_user(self, user_id, group_id):
+        query = """
+        SELECT t.id, t.name, t.timer_seconds
+        FROM THEME t
+        JOIN THEME_GROUP tg ON tg.theme_id = t.id
+        WHERE tg.group_id = ?
+        AND t.id NOT IN (
+            SELECT ts.theme_id FROM TEST_SUMMARY ts WHERE ts.user_id = ?
+        )
+        """
+        return self._execute(query, (group_id, user_id), fetch=True)
