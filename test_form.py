@@ -15,6 +15,7 @@ class TestForm(tk.Toplevel):
         self.all_dynamic_labels = []
         self.parent = parent
 
+        # Таймер и тема (оставляем как есть)
         self.theme = self.db.get_theme(test_id)
         self.timer_seconds = self.theme[2] if self.theme and self.theme[2] else None
         self.time_left = self.timer_seconds
@@ -61,8 +62,7 @@ class TestForm(tk.Toplevel):
 
     def center_window(self):
         self.update_idletasks()
-        w, h = self.winfo_width(), self.winfo_height()
-        w, h = (500, 400) if w <= 1 or h <= 1 else (w, h)
+        w, h = 500, 400
         x = (self.winfo_screenwidth() // 2) - (w // 2)
         y = (self.winfo_screenheight() // 2) - (h // 2)
         self.geometry(f"{w}x{h}+{x}+{y}")
@@ -76,9 +76,9 @@ class TestForm(tk.Toplevel):
         self.vscroll.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
         self.outer_frame = tk.Frame(self.canvas, background="#f0f0f0")
-        self.canvas.create_window((0, 0), window=self.outer_frame, anchor="n", tags="inner")
+        self.canvas.create_window((0, 0), window=self.outer_frame, anchor="nw", tags="inner")
         self.scrollable_frame = tk.Frame(self.outer_frame, background="#f0f0f0")
-        self.scrollable_frame.pack(anchor="n", pady=20)
+        self.scrollable_frame.pack(anchor="nw", pady=20)
         self.outer_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig("inner", width=e.width))
         self.canvas.bind_all("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
@@ -96,42 +96,22 @@ class TestForm(tk.Toplevel):
             w.destroy()
         self.all_dynamic_labels.clear()
         q = self.questions[self.current_question_index]
-        # ВОПРОС — по центру
-        q_label = tk.Label(
-            self.scrollable_frame,
-            text=q['text'],
-            font=("Arial", 14),
-            background="#f0f0f0",
-            justify="center",
-            anchor="center",
-            wraplength=420
-        )
-        q_label.pack(pady=(10, 10), padx=10, anchor="center")
+        q_label = tk.Label(self.scrollable_frame, text=q['text'], font=("Arial", 14),
+                           background="#f0f0f0", justify="left", anchor="w", wraplength=420)
+        q_label.pack(pady=(10, 10), padx=10, anchor="w")
         self.all_dynamic_labels.append(q_label)
 
-        # ОТВЕТЫ — по левому краю с отступом
         self.selected_option.set(-1)
         answers_frame = tk.Frame(self.scrollable_frame, background="#f0f0f0")
         answers_frame.pack(fill="x", padx=(20, 0), anchor="w")
 
         for idx, option in enumerate(q["options"]):
-            rb = tk.Radiobutton(
-                answers_frame,
-                variable=self.selected_option,
-                value=idx,
-                background="#f0f0f0",
-                highlightthickness=0
-            )
+            rb = tk.Radiobutton(answers_frame, variable=self.selected_option, value=idx,
+                                background="#f0f0f0", highlightthickness=0)
             rb.grid(row=idx, column=0, sticky="w", padx=(0, 5), pady=2)
-            lbl = tk.Label(
-                answers_frame,
-                text=option,
-                font=("Arial", 12),
-                background="#f0f0f0",
-                justify="left",
-                anchor="w",
-                wraplength=360
-            )
+
+            lbl = tk.Label(answers_frame, text=option, font=("Arial", 12),
+                           background="#f0f0f0", justify="left", anchor="w", wraplength=360)
             lbl.grid(row=idx, column=1, sticky="w", pady=2)
             self.all_dynamic_labels.append(lbl)
 
