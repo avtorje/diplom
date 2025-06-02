@@ -160,6 +160,26 @@ class Database:
             for r in rows
         ]
     
+    def get_user_by_name_and_group(self, username, group_id):
+        return self.fetch_one(
+            "SELECT * FROM USERS WHERE username = ? AND group_id = ?",
+            (username, group_id)
+        )
+    
+    def get_user_group_id(self, user_id):
+        result = self.fetch_one(
+            "SELECT group_id FROM USERS WHERE id = ?",
+            (user_id,)
+        )
+        return result["group_id"] if result else None
+    
+    def get_user_by_id(self, user_id):
+        # Если вы возвращаете словарь (а не кортеж), используйте row_factory=sqlite3.Row или дополнительное преобразование
+        return self.fetch_one(
+            "SELECT id, username, role, group_id FROM USERS WHERE id = ?",
+            (user_id,)
+        )
+    
     def get_admins_by_group(self, group_id):
         # Возвращает список словарей с пользователями-админами этой группы
         return self.fetch_all(
@@ -206,6 +226,18 @@ class Database:
     def get_groups(self):
         rows = self._execute("SELECT id, name FROM GROUPS ORDER BY id ASC", fetch=True)
         return [{"id": r["id"], "name": r["name"]} for r in rows]
+    
+    def get_group_by_name(self, group_name):
+        return self.fetch_one(
+            "SELECT * FROM GROUPS WHERE name = ?",
+            (group_name,)
+        )
+    
+    def get_group_by_id(self, group_id):
+        return self.fetch_one(
+            "SELECT * FROM GROUPS WHERE id = ?",
+            (group_id,)
+        )
 
     def add_group(self, name, access_code):
         self._execute("INSERT INTO GROUPS (name, access_code) VALUES (?, ?)", (name, access_code))
