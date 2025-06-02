@@ -6,6 +6,7 @@ class Database:
     def __init__(self, db_path: str = "database.db"):
         self.db_path = db_path
         self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row  # Позволяет получать строки как словари
         self.initialize()
 
     # --- Вспомогательные методы ---
@@ -25,7 +26,7 @@ class Database:
         return res[0] if res else None
 
     def _column_exists(self, table, column):
-        return any(r[1] == column for r in self._execute(f"PRAGMA table_info({table})", fetch=True))
+        return any(r["name"] == column for r in self._execute(f"PRAGMA table_info({table})", fetch=True))
 
     @staticmethod
     def hash_password(password):
@@ -131,8 +132,8 @@ class Database:
         row = self.fetch_one(query, tuple(kwargs.values()))
         if row:
             return {
-                "id": row[0], "username": row[1], "role": row[2], "group_id": row[3],
-                "first_name": row[4], "last_name": row[5], "middle_name": row[6]
+                "id": row["id"], "username": row["username"], "role": row["role"], "group_id": row["group_id"],
+                "first_name": row["first_name"], "last_name": row["last_name"], "middle_name": row["middle_name"]
             }
         return None
 
@@ -150,15 +151,15 @@ class Database:
         rows = self._execute(query, tuple(params), fetch=True)
         return [
             {
-                "id": r[0], "username": r[1], "first_name": r[2],
-                "last_name": r[3], "middle_name": r[4], "role": r[5]
+                "id": r["id"], "username": r["username"], "first_name": r["first_name"],
+                "last_name": r["last_name"], "middle_name": r["middle_name"], "role": r["role"]
             }
             for r in rows
         ]
 
     def check_admin_password(self, admin_id, password):
         row = self.fetch_one("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
-        return row and row[0] == self.hash_password(password)
+        return row and row["password"] == self.hash_password(password)
 
     def update_admin_password(self, admin_id, new_password):
         self._execute("UPDATE USERS SET password=? WHERE id=? AND role='admin'", (self.hash_password(new_password), admin_id))
@@ -170,21 +171,24 @@ class Database:
         )
         if row:
             return {
-                "id": row[0], "username": row[1], "role": row[2], "group_id": row[3],
-                "first_name": row[4], "last_name": row[5], "middle_name": row[6]
+                "id": row["id"], "username": row["username"], "role": row["role"], "group_id": row["group_id"],
+                "first_name": row["first_name"], "last_name": row["last_name"], "middle_name": row["middle_name"]
             }
         return None
 
     def get_main_admin(self):
         row = self.fetch_one("SELECT id, username, first_name, last_name, middle_name FROM USERS WHERE username='admin' AND role='admin'")
         if row:
-            return dict(zip(["id", "username", "first_name", "last_name", "middle_name"], row))
+            return {
+                "id": row["id"], "username": row["username"], "first_name": row["first_name"],
+                "last_name": row["last_name"], "middle_name": row["middle_name"]
+            }
         return None
 
     # --- Группы ---
     def get_groups(self):
         rows = self._execute("SELECT id, name FROM GROUPS ORDER BY id ASC", fetch=True)
-        return [{"id": r[0], "name": r[1]} for r in rows]
+        return [{"id": r["id"], "name": r["name"]} for r in rows]
 
     def add_group(self, name, access_code):
         self._execute("INSERT INTO GROUPS (name, access_code) VALUES (?, ?)", (name, access_code))
@@ -201,7 +205,7 @@ class Database:
         query = "SELECT id, name, access_code FROM GROUPS WHERE " + " AND ".join(f"{k}=?" for k in kwargs)
         row = self.fetch_one(query, tuple(kwargs.values()))
         if row:
-            return {"id": row[0], "name": row[1], "access_code": row[2]}
+            return {"id": row["id"], "name": row["name"], "access_code": row["access_code"]}
         return None
 
     # --- Тесты ---
@@ -214,24 +218,24 @@ class Database:
                 "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
             )
         return [
-            {"id": r[0], "name": r[1], "timer_seconds": r[2]}
+            {"id": r["id"], "name": r["name"], "timer_seconds": r["timer_seconds"]}
             for r in rows
         ]
 
     def get_test_name(self, theme_id):
         result = self.fetch_one("SELECT name FROM THEME WHERE id=?", (theme_id,))
-        return result[0] if result else "Без названия"
+        return result["name"] if result else "Без названия"
 
     def get_theme(self, theme_id):
         row = self.fetch_one("SELECT id, name, timer_seconds FROM THEME WHERE id=?", (theme_id,))
         if row:
-            return {"id": row[0], "name": row[1], "timer_seconds": row[2]}
+            return {"id": row["id"], "name": row["name"], "timer_seconds": row["timer_seconds"]}
         return None
 
     def add_test(self, test_name, timer_seconds=None):
         try:
             self._execute("INSERT INTO THEME (name, timer_seconds) VALUES (?, ?)", (test_name, timer_seconds))
-            return self.fetch_one("SELECT id FROM THEME WHERE name = ?", (test_name,))[0]
+            return self.fetch_one("SELECT id FROM THEME WHERE name = ?", (test_name,))["id"]
         except sqlite3.IntegrityError:
             raise ValueError("Тест с таким названием уже существует.")
 
@@ -251,14 +255,14 @@ class Database:
     def delete_test(self, test_id):
         question_ids = self._execute("SELECT id FROM QUESTION WHERE theme_id = ?", (test_id,), fetch=True)
         if question_ids:
-            self._execute("DELETE FROM ANSWER WHERE question_id = ?", [(qid[0],) for qid in question_ids], many=True)
+            self._execute("DELETE FROM ANSWER WHERE question_id = ?", [(qid["id"],) for qid in question_ids], many=True)
         self._execute("DELETE FROM QUESTION WHERE theme_id = ?", (test_id,))
         self._execute("DELETE FROM THEME WHERE id = ?", (test_id,))
 
     # --- Вопросы ---
     def get_questions(self, theme_id):
         query = """
-            SELECT q.id, q.theme_local_number, q.text, q.correct_options, GROUP_CONCAT(a.text, '|||')
+            SELECT q.id, q.theme_local_number, q.text, q.correct_options, GROUP_CONCAT(a.text, '|||') AS options
             FROM QUESTION q
             LEFT JOIN ANSWER a ON q.id = a.question_id
             WHERE q.theme_id = ?
@@ -267,11 +271,11 @@ class Database:
         rows = self._execute(query, (theme_id,), fetch=True)
         return [
             {
-                "id": row[0],
-                "theme_local_number": row[1],
-                "text": row[2],
-                "correct_options": list(map(int, row[3].split(","))) if row[3] else [],
-                "options": row[4].split("|||") if row[4] else []
+                "id": row["id"],
+                "theme_local_number": row["theme_local_number"],
+                "text": row["text"],
+                "correct_options": list(map(int, row["correct_options"].split(","))) if row["correct_options"] else [],
+                "options": row["options"].split("|||") if row["options"] else []
             }
             for row in rows
         ]
@@ -280,9 +284,9 @@ class Database:
         if not options:
             raise ValueError("Нельзя добавить вопрос без вариантов ответа.")
         theme_local_number = self.fetch_one(
-            "SELECT COALESCE(MAX(theme_local_number), 0) + 1 FROM QUESTION WHERE theme_id = ?",
+            "SELECT COALESCE(MAX(theme_local_number), 0) + 1 AS next_num FROM QUESTION WHERE theme_id = ?",
             (theme_id,)
-        )[0]
+        )["next_num"]
         cur = self.conn.cursor()
         cur.execute(
             "INSERT INTO QUESTION (theme_id, text, correct_options, theme_local_number) VALUES (?, ?, ?, ?)",
@@ -335,4 +339,4 @@ class Database:
         )
         """
         rows = self._execute(query, (group_id, user_id), fetch=True)
-        return [{"id": r[0], "name": r[1], "timer_seconds": r[2]} for r in rows]
+        return [{"id": r["id"], "name": r["name"], "timer_seconds": r["timer_seconds"]} for r in rows]
