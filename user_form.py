@@ -35,7 +35,7 @@ class UserForm(tk.Toplevel):
         self.role_combobox.bind("<<ComboboxSelected>>", self.role_changed)
 
         tk.Label(self, text="Группа:").pack()
-        group_names = [g[1] for g in self.groups]
+        group_names = [g['name'] for g in self.groups]
         self.group_combobox = ttk.Combobox(self, values=group_names, state="readonly")
         self.group_combobox.pack()
         if self.forced_group_id:

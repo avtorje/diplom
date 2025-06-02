@@ -49,7 +49,7 @@ class LoginForm(tk.Tk):
 
     def load_groups(self):
         groups = self.db.get_groups()
-        self.group_combobox['values'] = [g[1] for g in groups]
+        self.group_combobox['values'] = [g['name'] for g in groups]
 
     def login(self):
         username = self.username_entry.get()

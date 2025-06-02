@@ -37,14 +37,14 @@ class GroupsForm(tk.Toplevel):
     def load_groups(self):
         self.groups_listbox.delete(0, tk.END)
         self.groups = self.db.get_groups()
-        for i, group in enumerate(self.groups, 1):  # Корректная нумерация
-            self.groups_listbox.insert(tk.END, f"{i}. {group[1]}")
+        for i, group in enumerate(self.groups, 1):
+            self.groups_listbox.insert(tk.END, f"{i}. {group['name']}")
 
     def get_selected_group_id(self):
         idx = self.groups_listbox.curselection()
         if not idx:
             return None
-        return self.groups[idx[0]][0]
+        return self.groups[idx[0]]['id']
 
     def add_or_edit_group(self, edit=False):
         group_id = self.get_selected_group_id() if edit else None

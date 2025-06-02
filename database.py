@@ -61,7 +61,8 @@ class Database:
             )""",
             """CREATE TABLE IF NOT EXISTS THEME (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE
+                name TEXT NOT NULL UNIQUE,
+                timer_seconds INTEGER
             )""",
             """CREATE TABLE IF NOT EXISTS THEME_GROUP (
                 theme_id INTEGER,
@@ -127,7 +128,13 @@ class Database:
             return None
         query = "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE " + \
                 " AND ".join(f"{k}=?" for k in kwargs)
-        return self.fetch_one(query, tuple(kwargs.values()))
+        row = self.fetch_one(query, tuple(kwargs.values()))
+        if row:
+            return {
+                "id": row[0], "username": row[1], "role": row[2], "group_id": row[3],
+                "first_name": row[4], "last_name": row[5], "middle_name": row[6]
+            }
+        return None
 
     def get_users(self, group_id=None, role=None, exclude_main_admin=False):
         query = "SELECT id, username, first_name, last_name, middle_name, role FROM USERS WHERE 1=1"
@@ -140,7 +147,14 @@ class Database:
             params.append(role)
         if exclude_main_admin:
             query += " AND NOT (role='admin' AND username='admin')"
-        return self._execute(query, tuple(params), fetch=True)
+        rows = self._execute(query, tuple(params), fetch=True)
+        return [
+            {
+                "id": r[0], "username": r[1], "first_name": r[2],
+                "last_name": r[3], "middle_name": r[4], "role": r[5]
+            }
+            for r in rows
+        ]
 
     def check_admin_password(self, admin_id, password):
         row = self.fetch_one("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
@@ -150,10 +164,16 @@ class Database:
         self._execute("UPDATE USERS SET password=? WHERE id=? AND role='admin'", (self.hash_password(new_password), admin_id))
 
     def validate_user(self, username, password):
-        return self.fetch_one(
-            "SELECT * FROM USERS WHERE username = ? AND password = ?",
+        row = self.fetch_one(
+            "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE username = ? AND password = ?",
             (username, self.hash_password(password))
         )
+        if row:
+            return {
+                "id": row[0], "username": row[1], "role": row[2], "group_id": row[3],
+                "first_name": row[4], "last_name": row[5], "middle_name": row[6]
+            }
+        return None
 
     def get_main_admin(self):
         row = self.fetch_one("SELECT id, username, first_name, last_name, middle_name FROM USERS WHERE username='admin' AND role='admin'")
@@ -163,7 +183,8 @@ class Database:
 
     # --- Группы ---
     def get_groups(self):
-        return self._execute("SELECT id, name FROM GROUPS ORDER BY id ASC", fetch=True)
+        rows = self._execute("SELECT id, name FROM GROUPS ORDER BY id ASC", fetch=True)
+        return [{"id": r[0], "name": r[1]} for r in rows]
 
     def add_group(self, name, access_code):
         self._execute("INSERT INTO GROUPS (name, access_code) VALUES (?, ?)", (name, access_code))
@@ -186,18 +207,26 @@ class Database:
     # --- Тесты ---
     def get_all_tests(self, group_id=None):
         if group_id is None:
-            return self._execute("SELECT id, name, timer_seconds FROM THEME", fetch=True)
-        return self._execute(
-            "SELECT t.id, t.name, t.timer_seconds FROM THEME t "
-            "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
-        )
+            rows = self._execute("SELECT id, name, timer_seconds FROM THEME", fetch=True)
+        else:
+            rows = self._execute(
+                "SELECT t.id, t.name, t.timer_seconds FROM THEME t "
+                "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
+            )
+        return [
+            {"id": r[0], "name": r[1], "timer_seconds": r[2]}
+            for r in rows
+        ]
 
     def get_test_name(self, theme_id):
         result = self.fetch_one("SELECT name FROM THEME WHERE id=?", (theme_id,))
         return result[0] if result else "Без названия"
 
     def get_theme(self, theme_id):
-        return self.fetch_one("SELECT id, name, timer_seconds FROM THEME WHERE id=?", (theme_id,))
+        row = self.fetch_one("SELECT id, name, timer_seconds FROM THEME WHERE id=?", (theme_id,))
+        if row:
+            return {"id": row[0], "name": row[1], "timer_seconds": row[2]}
+        return None
 
     def add_test(self, test_name, timer_seconds=None):
         try:
@@ -305,4 +334,5 @@ class Database:
             SELECT ts.theme_id FROM TEST_SUMMARY ts WHERE ts.user_id = ?
         )
         """
-        return self._execute(query, (group_id, user_id), fetch=True)
+        rows = self._execute(query, (group_id, user_id), fetch=True)
+        return [{"id": r[0], "name": r[1], "timer_seconds": r[2]} for r in rows]

@@ -45,7 +45,7 @@ class ManageUsersForm(tk.Toplevel):
         self.groups_listbox.delete(0, tk.END)
         self.groups = self.db.get_groups()
         for i, group in enumerate(self.groups, 1):  # корректная нумерация
-            self.groups_listbox.insert(tk.END, f"{i}. {group[1]}")
+            self.groups_listbox.insert(tk.END, f"{i}. {group['name']}")
         # Не выделяем автоматически первую строку!
 
     def on_group_double_click(self, event):
@@ -55,7 +55,7 @@ class ManageUsersForm(tk.Toplevel):
             return
         self.groups_listbox.selection_clear(0, tk.END)
         self.groups_listbox.selection_set(idx)
-        group_id = self.groups[idx][0]
+        group_id = self.groups[idx]['id']
         GroupUsersForm(self, group_id)
 
     def open_groups_form(self):
