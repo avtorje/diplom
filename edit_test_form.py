@@ -46,7 +46,7 @@ class EditTestForm(tk.Toplevel):
     def load_test_timer(self):
         theme = self.db.get_theme(self.test_id)
         if theme:
-            timer_seconds = theme[2]
+            timer_seconds = theme["timer_seconds"]
             if timer_seconds and timer_seconds > 0:
                 self.timer_var.set(str(timer_seconds // 60))
                 self.timer_check.set(0)

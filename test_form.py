@@ -19,9 +19,9 @@ class TestForm(tk.Toplevel):
         self.start_time = time.time()
         self.student_form = student_form
 
-        # Таймер и тема (оставляем как есть)
+        # Таймер и тема (обращения к словарю)
         self.theme = self.db.get_theme(test_id)
-        self.timer_seconds = self.theme[2] if self.theme and self.theme[2] else None
+        self.timer_seconds = self.theme["timer_seconds"] if self.theme and self.theme["timer_seconds"] else None
         self.time_left = self.timer_seconds
 
         self.title(f"Тест - {self.db.get_test_name(test_id)}")

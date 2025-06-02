@@ -12,7 +12,7 @@ class GroupSelectDialog(tk.Toplevel):
         tk.Label(self, text="Выберите группы для теста:").pack(pady=8)
         self.listbox = tk.Listbox(self, selectmode=tk.MULTIPLE)
         for group in groups:
-            self.listbox.insert(tk.END, group[1])
+            self.listbox.insert(tk.END, group["name"])  # заменено group[1] -> group["name"]
         self.listbox.pack(padx=10, pady=8, fill=tk.BOTH, expand=True)
 
         btns = tk.Frame(self)

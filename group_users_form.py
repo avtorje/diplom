@@ -10,7 +10,7 @@ class GroupUsersForm(tk.Toplevel):
         self.group_id = group_id
         self.title(f"Пользователи группы {self.get_group_name()}")
         self.center_window(350, 650)
-        self._create_widgets()  # исправлено!
+        self._create_widgets()
         self._load_group_users()
 
     def center_window(self, width=350, height=650):
@@ -23,7 +23,8 @@ class GroupUsersForm(tk.Toplevel):
 
     def get_group_name(self):
         group = self.db._execute("SELECT name FROM GROUPS WHERE id=?", (self.group_id,), fetch=True)
-        return group[0][0] if group else "?"
+        # group[0][0] => group[0]["name"] (если row_factory=sqlite3.Row)
+        return group[0]["name"] if group else "?"
 
     def _create_widgets(self):
         for label, attr in [("Администраторы группы:", "admins_listbox"), ("Студенты группы:", "students_listbox")]:
@@ -60,8 +61,9 @@ class GroupUsersForm(tk.Toplevel):
             users = getter(self.group_id)
             ids = []
             for idx, user in enumerate(users, 1):
-                lb.insert(tk.END, f"{idx}. {user[1]}")
-                ids.append(user[0])
+                # user[1] -> user["username"], user[0] -> user["id"]
+                lb.insert(tk.END, f"{idx}. {user['username']}")
+                ids.append(user["id"])
             setattr(self, id_attr, ids)
 
     def _get_selected_user_id(self):

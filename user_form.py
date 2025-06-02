@@ -49,7 +49,7 @@ class UserForm(tk.Toplevel):
         self.role_changed()
 
     def get_group_name(self, group_id):
-        return next((g[1] for g in self.groups if g[0] == group_id), "")
+        return next((g['name'] for g in self.groups if g['id'] == group_id), "")
 
     def role_changed(self, event=None):
         if self.role_combobox.get() == "admin":
@@ -62,7 +62,7 @@ class UserForm(tk.Toplevel):
     def save_user(self):
         username = self.username_entry.get()
         role = self.role_combobox.get()
-        group_id = self.forced_group_id or next((g[0] for g in self.groups if g[1] == self.group_combobox.get()), None)
+        group_id = self.forced_group_id or next((g['id'] for g in self.groups if g['name'] == self.group_combobox.get()), None)
 
         if not username or not role:
             messagebox.showerror("Ошибка", "Заполните все поля")
@@ -75,7 +75,7 @@ class UserForm(tk.Toplevel):
 
         if self.user_id:
             user = self.db.get_user_by_id(self.user_id)
-            if user and user[1] == "admin" and user[2] == "admin":
+            if user and user['role'] == "admin" and user['username'] == "admin":
                 messagebox.showerror("Ошибка", "Главного администратора нельзя редактировать")
                 return
             self.db.update_user(self.user_id, username, password, role, group_id)
@@ -87,12 +87,12 @@ class UserForm(tk.Toplevel):
         user = self.db.get_user_by_id(self.user_id)
         if user:
             self.username_entry.delete(0, tk.END)
-            self.username_entry.insert(0, user[1])
-            self.role_combobox.set(user[2])
+            self.username_entry.insert(0, user['username'])
+            self.role_combobox.set(user['role'])
             for i, g in enumerate(self.groups):
-                if g[0] == user[3]:
+                if g['id'] == user['group_id']:
                     self.group_combobox.current(i)
                     break
-            if user[2] == "admin":
+            if user['role'] == "admin":
                 self.password_label.pack()
                 self.password_entry.pack()

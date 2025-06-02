@@ -75,10 +75,11 @@ class LoginForm(tk.Tk):
         self._open_form(user, student=True)
 
     def _open_form(self, user, student=False):
-        if not student and user[3] == "admin":
+        # user был кортежем, теперь это словарь!
+        if not student and user["role"] == "admin":
             messagebox.showinfo("Успешно", "Добро пожаловать, администратор!")
             self.destroy()
-            AdminForm(user[0]).mainloop()
+            AdminForm(user["id"]).mainloop()
         else:
             messagebox.showinfo("Вход выполнен", f"Добро пожаловать, {user['username']}!")
             self.withdraw()
@@ -89,7 +90,8 @@ class LoginForm(tk.Tk):
         group = self.db.get_group_by_name(group_name)
         if group:
             students = self.db.get_students_by_group(group['id'])
-            self.student_combobox['values'] = [s[1] for s in students]
+            # students теперь список словарей, а не кортежей
+            self.student_combobox['values'] = [s['username'] for s in students]
             self.student_combobox.set('')
 
     def open_register_form(self):

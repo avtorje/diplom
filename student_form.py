@@ -16,7 +16,7 @@ class StudentForm(tk.Toplevel):
 
         group_id = self.db.get_user_group_id(self.user_id)
         group_info = self.db.get_group_by_id(group_id)
-        group_name = group_info[1] if group_info else "Не определена"
+        group_name = group_info["name"] if group_info else "Не определена"
 
         info_frame = tk.Frame(self)
         info_frame.pack(pady=10)

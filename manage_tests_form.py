@@ -31,14 +31,15 @@ class ManageTestsForm(tk.Toplevel):
     def load_tests(self):
         self.tests_listbox.delete(0, tk.END)
         self.tests = self.db.get_all_tests()
-        for idx, (test_id, name, *rest) in enumerate(self.tests, 1):
-            timer = rest[0] if rest else None
+        for idx, test in enumerate(self.tests, 1):
+            name = test["name"]
+            timer = test.get("timer_seconds")
             timer_str = f" (Время выполнения: {timer//60} мин)" if timer and timer > 0 else ""
             self.tests_listbox.insert(tk.END, f"{idx}. {name}{timer_str}")
 
     def get_selected_test_id(self):
         selected = self.tests_listbox.curselection()
-        return self.tests[selected[0]][0] if selected else None
+        return self.tests[selected[0]]["id"] if selected else None
 
     def add_test(self):
         test_name = simpledialog.askstring("Добавить тест", "Введите название нового теста:")
@@ -56,7 +57,7 @@ class ManageTestsForm(tk.Toplevel):
             messagebox.showwarning("Внимание", "Не выбраны группы. Тест не будет создан.")
             return
 
-        group_ids = [groups[i][0] for i in dlg.selected]
+        group_ids = [groups[i]["id"] for i in dlg.selected]
 
         try:
             # Добавляем тест без таймера по умолчанию
