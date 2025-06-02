@@ -25,6 +25,9 @@ class Database:
         res = self._execute(query, params, fetch=True)
         return res[0] if res else None
 
+    def fetch_all(self, query, params=()):
+        return self._execute(query, params, fetch=True)
+
     def _column_exists(self, table, column):
         return any(r["name"] == column for r in self._execute(f"PRAGMA table_info({table})", fetch=True))
 
@@ -156,6 +159,20 @@ class Database:
             }
             for r in rows
         ]
+    
+    def get_admins_by_group(self, group_id):
+        # Возвращает список словарей с пользователями-админами этой группы
+        return self.fetch_all(
+            "SELECT id, username FROM USERS WHERE group_id = ? AND role = 'admin'",
+            (group_id,)
+        )
+
+    def get_students_by_group(self, group_id):
+        # Возвращает список словарей с пользователями-студентами этой группы
+        return self.fetch_all(
+            "SELECT id, username FROM USERS WHERE group_id = ? AND role = 'student'",
+            (group_id,)
+        )
 
     def check_admin_password(self, admin_id, password):
         row = self.fetch_one("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
