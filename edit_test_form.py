@@ -60,8 +60,10 @@ class EditTestForm(tk.Toplevel):
             self.toggle_timer()
 
     def toggle_timer(self):
+        # Обеспечивает корректную работу поля таймера при изменении чекбокса
         if self.timer_check.get():
             self.timer_entry.configure(state='disabled')
+            self.timer_var.set("")  # очищаем значение, когда таймер убран
         else:
             self.timer_entry.configure(state='normal')
 
@@ -79,6 +81,8 @@ class EditTestForm(tk.Toplevel):
                 timer_seconds = mins * 60
             self.db.update_test(self.test_id, self.db.get_test_name(self.test_id), timer_seconds)
             messagebox.showinfo("Успешно", "Таймер теста сохранён.", parent=self)
+            # После сохранения таймера обновим состояние поля и чекбокса
+            self.load_test_timer()
         except Exception:
             messagebox.showerror("Ошибка", "Введите корректное значение таймера (целое число минут > 0) либо уберите таймер.", parent=self)
 
