@@ -97,7 +97,7 @@ class ManageUsersForm(tk.Toplevel):
         # Группы
         frame_groups = tk.LabelFrame(self, text="Группы")
         frame_groups.pack(fill=tk.X, padx=10, pady=5)
-        self.groups_listbox = tk.Listbox(frame_groups, height=8)
+        self.groups_listbox = tk.Listbox(frame_groups, height=8, exportselection=False)
         self.groups_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         btns_g = tk.Frame(frame_groups)
         btns_g.pack(side=tk.RIGHT, padx=5)
@@ -109,7 +109,7 @@ class ManageUsersForm(tk.Toplevel):
         # Студенты группы
         frame_students = tk.LabelFrame(self, text="Студенты группы")
         frame_students.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
-        self.students_listbox = tk.Listbox(frame_students)
+        self.students_listbox = tk.Listbox(frame_students, exportselection=False)
         self.students_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         btns_s = tk.Frame(frame_students)
         btns_s.pack(side=tk.RIGHT, padx=5)
