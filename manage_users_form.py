@@ -83,7 +83,7 @@ class ManageUsersForm(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.db = Database()
-        self.title("Управление преподавателями")
+        self.title("Управление пользователями")
         self.center_window(500, 500)
         self.parent = parent
         self.create_widgets()
