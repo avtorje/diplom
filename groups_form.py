@@ -28,6 +28,7 @@ class GroupsForm(tk.Toplevel):
         btns = [
             ("Добавить группу", self.add_or_edit_group),
             ("Редактировать группу", lambda: self.add_or_edit_group(edit=True)),
+            ("Пользователи группы", self.open_group_users),
             ("Удалить группу", self.delete_group),
             ("Закрыть", self.destroy)
         ]
@@ -71,3 +72,10 @@ class GroupsForm(tk.Toplevel):
         if messagebox.askyesno("Удалить группу", "Вы уверены?"):
             self.db.delete_group(group_id)
             self.load_groups()
+
+    def open_group_users(self):
+        group_id = self.get_selected_group_id()
+        if not group_id:
+            messagebox.showerror("Ошибка", "Выберите группу для просмотра пользователей.")
+            return
+        GroupUsersForm(self, group_id)

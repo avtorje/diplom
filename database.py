@@ -210,7 +210,7 @@ class Database:
 
     def get_user_by_id(self, user_id):
         return self.fetch_one(
-            "SELECT id, username, role, group_id FROM USERS WHERE id = ?",
+            "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE id = ?",
             (user_id,)
         )
 
@@ -229,7 +229,7 @@ class Database:
 
     def get_admins_by_group(self, group_id):
         rows = self._execute(
-            "SELECT u.id, u.username, u.first_name, u.last_name FROM ADMIN_GROUP ag JOIN USERS u ON ag.admin_id = u.id WHERE ag.group_id=?",
+            "SELECT u.id, u.username, u.first_name, u.last_name FROM ADMIN_GROUP ag JOIN USERS u ON ag.admin_id = u.id WHERE ag.group_id=? AND NOT (u.username = 'admin' AND u.role = 'admin')",
             (group_id,), fetch=True
         )
         return [dict(r) for r in rows]

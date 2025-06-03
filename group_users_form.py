@@ -48,7 +48,7 @@ class GroupUsersForm(tk.Toplevel):
         return group[0]["name"] if group else "?"
 
     def _create_widgets(self):
-        # Админы
+        # Преподаватели
         tk.Label(self, text="Преподаватели группы:", font=("Arial", 12, "bold")).pack(pady=2)
         self.admins_listbox = tk.Listbox(self)
         self.admins_listbox.pack(fill=tk.X, pady=2)
@@ -65,7 +65,6 @@ class GroupUsersForm(tk.Toplevel):
         tk.Button(stud_btn_frame, text="Добавить студента", command=self._add_student).pack(side=tk.LEFT, padx=2)
         tk.Button(stud_btn_frame, text="Редактировать студента", command=self._edit_student).pack(side=tk.LEFT, padx=2)
         tk.Button(stud_btn_frame, text="Удалить студента", command=self._delete_student).pack(side=tk.LEFT, padx=2)
-        # Закрыть
         tk.Button(self, text="Закрыть", command=self.destroy).pack(pady=7)
 
     def _load_group_users(self):
@@ -73,13 +72,15 @@ class GroupUsersForm(tk.Toplevel):
         self.students_listbox.delete(0, tk.END)
         self.admin_ids = []
         self.student_ids = []
-        # Преподаватели через ADMIN_GROUP
+
         admins = self.db.get_admins_by_group(self.group_id)
+        # DEBUG: print(admins)  # убрать после отладки
+
         for idx, admin in enumerate(admins, 1):
             label = f"{idx}. {admin['last_name']} {admin['first_name']} ({admin['username']})"
             self.admins_listbox.insert(tk.END, label)
             self.admin_ids.append(admin['id'])
-        # Студенты по group_id
+
         students = self.db.get_students_by_group(self.group_id)
         for idx, st in enumerate(students, 1):
             label = f"{idx}. {st['last_name']} {st['first_name']}"

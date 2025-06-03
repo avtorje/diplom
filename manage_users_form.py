@@ -35,11 +35,6 @@ class AddAdminToGroupsDialog(simpledialog.Dialog):
 class AddUserDialog(simpledialog.Dialog):
     def body(self, master):
         self.result = None
-        tk.Label(master, text="Выберите роль:").grid(row=0, column=0, columnspan=2, pady=5)
-        self.role_var = tk.StringVar(value="admin")
-        tk.Radiobutton(master, text="Преподаватель", variable=self.role_var, value="admin", command=self.update_fields).grid(row=1, column=0)
-        # Студентов добавляем только через форму группы!
-        # tk.Radiobutton(master, text="Студент", variable=self.role_var, value="student", command=self.update_fields).grid(row=1, column=1)
         tk.Label(master, text="Имя:").grid(row=2, column=0, sticky="e")
         self.first_name_entry = tk.Entry(master)
         self.first_name_entry.grid(row=2, column=1)
