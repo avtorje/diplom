@@ -128,6 +128,37 @@ class Database:
             (username, self.hash_password(password), "admin", first_name, last_name)
         )
 
+    def check_admin_password(self, admin_id, password):
+        row = self.fetch_one("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
+        return row and row["password"] == self.hash_password(password)
+
+    def get_main_admin(self):
+        row = self.fetch_one("SELECT id, username, first_name, last_name, middle_name FROM USERS WHERE username='admin' AND role='admin'")
+        if row:
+            return {
+                "id": row["id"], "username": row["username"], "first_name": row["first_name"],
+                "last_name": row["last_name"], "middle_name": row["middle_name"]
+            }
+        return None
+    
+    def update_admin_password(self, admin_id, new_password):
+        self._execute(
+            "UPDATE USERS SET password=? WHERE id=? AND role='admin'",
+            (self.hash_password(new_password), admin_id)
+        )
+
+    def validate_user(self, username, password):
+        row = self.fetch_one(
+            "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE username = ? AND password = ?",
+            (username, self.hash_password(password))
+        )
+        if row:
+            return {
+                "id": row["id"], "username": row["username"], "role": row["role"], "group_id": row["group_id"],
+                "first_name": row["first_name"], "last_name": row["last_name"], "middle_name": row["middle_name"]
+            }
+        return None
+
     def update_user(self, user_id, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
         fields = ["username=?", "role=?", "group_id=?", "first_name=?", "last_name=?", "middle_name=?"]
         params = [username, role, group_id, first_name, last_name, middle_name]
