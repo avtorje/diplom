@@ -37,23 +37,36 @@ class JournalWindow(tk.Toplevel):
         self.tree.heading("timer", text="Ограничение по времени")
         self.tree.heading("answers", text="Время прохождения (сек)")
 
-        for col in columns:
-            self.tree.column(col, anchor="center")
+        # Устанавливаем ширину столбцов: score и mark уменьшены в 3 раза
+        self.tree.column("score", anchor="center", width=100) # Было 150, стало 50
+        self.tree.column("mark", anchor="center", width=100)  # Было 120, стало 40
 
-        # Scrollbar
+        # Остальные столбцы можно оставить по умолчанию или скорректировать под себя
+        for col in columns:
+            if col not in ("score", "mark"):
+                self.tree.column(col, anchor="center")
+
+        # Вертикальный скроллбар
         vsb = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
+
+        # Горизонтальный скроллбар
+        hsb = ttk.Scrollbar(self, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(xscrollcommand=hsb.set)
+
         self.tree.grid(row=0, column=0, sticky="nsew")
         vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")  # горизонтальный скроллбар под деревом
+
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # Итоговая строка
+        # Итоговая строка под скроллами
         self.avg_label = ttk.Label(self, text="")
-        self.avg_label.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self.avg_label.grid(row=2, column=0, columnspan=2, sticky="ew")
 
         self.populate(db, user_id)
-        self.center_window()  # Центрирование окна
+        self.center_window()
 
     def center_window(self):
         self.update_idletasks()
@@ -72,14 +85,13 @@ class JournalWindow(tk.Toplevel):
         count = 0
         for r in results:
             mark = calc_mark(r["score"])
-            timer_display = format_timer(r.get("timer_seconds"))
-            # Время прохождения если будете сохранять (иначе уберите)
-            answers_time = ""  # Можно парсить из r["answers"], если там есть время, иначе добавить отдельное поле
+            timer_display = format_timer(r["timer_seconds"])
+            answers_time = ""  # если нужно
             self.tree.insert(
                 "", "end",
                 values=(
                     r["test_name"],
-                    r.get("teacher_name", ""),
+                    r["teacher_name"] if "teacher_name" in r.keys() else "",
                     r["date"],
                     r["score"],
                     mark,
