@@ -12,8 +12,10 @@ class EditTestForm(tk.Toplevel):
         self.geometry("500x500")
         self.center_window()
         self.create_widgets()
+        self.initialized = False  # Флаг для предотвращения повторной инициализации
         self.load_test_timer()
         self.load_questions()
+        self.initialized = True
 
     def create_widgets(self):
         tk.Label(self, text="Редактирование теста", font=("Arial", 16)).pack(pady=10)
@@ -25,10 +27,12 @@ class EditTestForm(tk.Toplevel):
         self.timer_var = tk.StringVar()
         self.timer_entry = tk.Entry(timer_frame, textvariable=self.timer_var, width=6)
         self.timer_entry.pack(side="left", padx=(0, 10))
-        self.timer_check = tk.IntVar()
+        # Всегда по умолчанию "убрать таймер", даже после возврата через "Назад"
+        self.timer_check = tk.IntVar(value=1)
         self.timer_remove = tk.Checkbutton(timer_frame, text="Убрать таймер", variable=self.timer_check, command=self.toggle_timer)
         self.timer_remove.pack(side="left")
         tk.Button(timer_frame, text="Сохранить таймер", command=self.save_timer).pack(side="left", padx=5)
+        self.toggle_timer()  # Гарантируем начальное состояние
 
         # --- Вопросы ---
         self.questions_listbox = tk.Listbox(self)
@@ -45,19 +49,15 @@ class EditTestForm(tk.Toplevel):
 
     def load_test_timer(self):
         theme = self.db.get_theme(self.test_id)
-        if theme:
-            timer_seconds = theme["timer_seconds"]
-            if timer_seconds and timer_seconds > 0:
-                self.timer_var.set(str(timer_seconds // 60))
-                self.timer_check.set(0)
-            else:
-                self.timer_var.set("")
-                self.timer_check.set(1)
-            self.toggle_timer()
+        # Если тест новый или timer_seconds не задан — всегда "убрать таймер"
+        if theme and theme["timer_seconds"] is not None and theme["timer_seconds"] > 0:
+            self.timer_var.set(str(theme["timer_seconds"] // 60))
+            self.timer_check.set(0)
         else:
             self.timer_var.set("")
             self.timer_check.set(1)
-            self.toggle_timer()
+        # toggle_timer должен вызываться только после корректной установки timer_check!
+        self.toggle_timer()
 
     def toggle_timer(self):
         # Обеспечивает корректную работу поля таймера при изменении чекбокса
@@ -68,7 +68,6 @@ class EditTestForm(tk.Toplevel):
             self.timer_entry.configure(state='normal')
 
     def save_timer(self):
-        # Сохраняет таймер в БД
         try:
             timer_seconds = None
             if not self.timer_check.get():
@@ -81,7 +80,6 @@ class EditTestForm(tk.Toplevel):
                 timer_seconds = mins * 60
             self.db.update_test(self.test_id, self.db.get_test_name(self.test_id), timer_seconds)
             messagebox.showinfo("Успешно", "Таймер теста сохранён.", parent=self)
-            # После сохранения таймера обновим состояние поля и чекбокса
             self.load_test_timer()
         except Exception:
             messagebox.showerror("Ошибка", "Введите корректное значение таймера (целое число минут > 0) либо уберите таймер.", parent=self)
@@ -254,12 +252,10 @@ class EditTestForm(tk.Toplevel):
             no_corr.grid(row=next_row, column=0, sticky="n", pady=5)
             all_dynamic_labels.append(no_corr)
 
-        # 🛠️ Вызов обновления wraplength один раз после полной инициализации окна
         def force_initial_wrap():
             update_wraplength_now()
 
         win.after(100, force_initial_wrap)
-
 
     def create_scrollable_frame(self, win):
         container = tk.Frame(win)
@@ -272,12 +268,11 @@ class EditTestForm(tk.Toplevel):
         vscroll.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
 
-        # 🎯 Вложенный контейнер, выравнивающий всё по центру
         outer_frame = tk.Frame(canvas, background="#f0f0f0")
         canvas.create_window((0, 0), window=outer_frame, anchor="n", tags="inner")
 
         scrollable_frame = tk.Frame(outer_frame, background="#f0f0f0")
-        scrollable_frame.pack(anchor="n", pady=20)  # <-- по центру сверху
+        scrollable_frame.pack(anchor="n", pady=20)
 
         def on_frame_configure(event):
             canvas.configure(scrollregion=canvas.bbox("all"))
@@ -291,7 +286,6 @@ class EditTestForm(tk.Toplevel):
 
         return scrollable_frame, canvas
 
-
     def delete_question(self):
         idx = self.get_selected_index("удаления")
         if idx is None:
@@ -301,7 +295,6 @@ class EditTestForm(tk.Toplevel):
             self.db.delete_question(q["id"])
             self.renumber_questions()
             self.load_questions()
-            # выделить предыдущий вопрос (если есть)
             next_idx = min(idx, len(self.questions) - 1)
             if next_idx >= 0:
                 self.questions_listbox.selection_clear(0, tk.END)
@@ -315,8 +308,10 @@ class EditTestForm(tk.Toplevel):
                 self.db.update_theme_local_number(q['id'], idx+1)
 
     def go_back(self):
+        # При возврате всегда очищаем и инициализируем переменные таймера заново!
         self.destroy()
-        if self.parent: self.parent.deiconify()
+        if self.parent:
+            self.parent.deiconify()
 
     def center_window(self, window=None):
         window = window or self

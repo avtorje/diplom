@@ -14,6 +14,7 @@ class TestForm(tk.Toplevel):
         self.answers = []
         self.current_question_index = 0
         self.selected_option = tk.IntVar(value=-1)
+        self.selected_options_vars = None  # Для множественного выбора
         self.all_dynamic_labels = []
         self.parent = parent
         self.start_time = time.time()
@@ -57,8 +58,13 @@ class TestForm(tk.Toplevel):
 
     def finish_test_due_to_timeout(self):
         # Остальные неотвеченные вопросы считаются без ответа
-        self.answers += [-1] * (len(self.questions) - len(self.answers))
-        score = sum(ans == q["correct_options"] for ans, q in zip(self.answers, self.questions))
+        while len(self.answers) < len(self.questions):
+            q = self.questions[len(self.answers)]
+            if len(q["correct_options"]) > 1:
+                self.answers.append([])  # пустой выбор для множественного
+            else:
+                self.answers.append(-1)
+        score = self.calculate_score()
         self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
         percent = (score / len(self.questions)) * 100 if self.questions else 0
         total_time = self.timer_seconds
@@ -105,19 +111,32 @@ class TestForm(tk.Toplevel):
         q_label.pack(pady=(10, 10), padx=10, anchor="w")
         self.all_dynamic_labels.append(q_label)
 
-        self.selected_option.set(-1)
+        is_multiple = len(q["correct_options"]) > 1
         answers_frame = tk.Frame(self.scrollable_frame, background="#f0f0f0")
         answers_frame.pack(fill="x", padx=(20, 0), anchor="w")
 
-        for idx, option in enumerate(q["options"]):
-            rb = tk.Radiobutton(answers_frame, variable=self.selected_option, value=idx,
-                                background="#f0f0f0", highlightthickness=0)
-            rb.grid(row=idx, column=0, sticky="w", padx=(0, 5), pady=2)
-
-            lbl = tk.Label(answers_frame, text=option, font=("Arial", 12),
-                           background="#f0f0f0", justify="left", anchor="w", wraplength=360)
-            lbl.grid(row=idx, column=1, sticky="w", pady=2)
-            self.all_dynamic_labels.append(lbl)
+        if is_multiple:
+            self.selected_options_vars = []
+            for idx, option in enumerate(q["options"]):
+                var = tk.IntVar(value=0)
+                cb = tk.Checkbutton(answers_frame, variable=var, background="#f0f0f0")
+                cb.grid(row=idx, column=0, sticky="w", padx=(0, 5), pady=2)
+                lbl = tk.Label(answers_frame, text=option, font=("Arial", 12),
+                               background="#f0f0f0", justify="left", anchor="w", wraplength=360)
+                lbl.grid(row=idx, column=1, sticky="w", pady=2)
+                self.selected_options_vars.append(var)
+                self.all_dynamic_labels.append(lbl)
+        else:
+            self.selected_option.set(-1)
+            self.selected_options_vars = None
+            for idx, option in enumerate(q["options"]):
+                rb = tk.Radiobutton(answers_frame, variable=self.selected_option, value=idx,
+                                    background="#f0f0f0", highlightthickness=0)
+                rb.grid(row=idx, column=0, sticky="w", padx=(0, 5), pady=2)
+                lbl = tk.Label(answers_frame, text=option, font=("Arial", 12),
+                               background="#f0f0f0", justify="left", anchor="w", wraplength=360)
+                lbl.grid(row=idx, column=1, sticky="w", pady=2)
+                self.all_dynamic_labels.append(lbl)
 
         is_last = self.current_question_index == len(self.questions) - 1
         self.next_button.config(
@@ -128,21 +147,39 @@ class TestForm(tk.Toplevel):
         self.canvas.yview_moveto(0)
 
     def _on_next(self):
-        sel = self.selected_option.get()
-        if sel == -1:
-            messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.", parent=self)
-            return
-        self.answers.append(sel)
+        q = self.questions[self.current_question_index]
+        is_multiple = len(q["correct_options"]) > 1
+        if is_multiple:
+            selected = [i for i, var in enumerate(self.selected_options_vars) if var.get()]
+            if not selected:
+                messagebox.showwarning("Нет ответа", "Пожалуйста, выберите хотя бы один вариант.", parent=self)
+                return
+            self.answers.append(selected)
+        else:
+            sel = self.selected_option.get()
+            if sel == -1:
+                messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.", parent=self)
+                return
+            self.answers.append(sel)
         self.current_question_index += 1
         self.load_question()
 
     def _on_finish(self):
-        sel = self.selected_option.get()
-        if sel == -1:
-            messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.", parent=self)
-            return
-        self.answers.append(sel)
-        score = sum(ans == q["correct_options"] for ans, q in zip(self.answers, self.questions))
+        q = self.questions[self.current_question_index]
+        is_multiple = len(q["correct_options"]) > 1
+        if is_multiple:
+            selected = [i for i, var in enumerate(self.selected_options_vars) if var.get()]
+            if not selected:
+                messagebox.showwarning("Нет ответа", "Пожалуйста, выберите хотя бы один вариант.", parent=self)
+                return
+            self.answers.append(selected)
+        else:
+            sel = self.selected_option.get()
+            if sel == -1:
+                messagebox.showwarning("Нет ответа", "Пожалуйста, выберите вариант ответа.", parent=self)
+                return
+            self.answers.append(sel)
+        score = self.calculate_score()
         self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
         percent = (score / len(self.questions)) * 100 if self.questions else 0
         # Время прохождения теста
@@ -152,16 +189,27 @@ class TestForm(tk.Toplevel):
             total_time = int(time.time() - self.start_time)
         self.show_result_window(total_time if self.timer_seconds else None, percent)
 
+    def calculate_score(self):
+        score = 0
+        for ans, q in zip(self.answers, self.questions):
+            if isinstance(ans, list):
+                # Множественный выбор, сравнение множеств
+                if set(ans) == set(q["correct_options"]):
+                    score += 1
+            else:
+                if ans in q["correct_options"]:
+                    score += 1
+        return score
+
     def show_result_window(self, time_seconds, percent):
         def back_to_student():
             self.destroy()  # Закрыть окно теста
             self.student_form.deiconify()  # Показать панель студента
-        from test_result_window import TestResultWindow
         TestResultWindow(
             self,
             db=self.db,
             user_id=self.user_id,
-            theme_id=self.test_id,  # <-- исправлено!
+            theme_id=self.test_id,
             time_seconds=time_seconds,
             percent=percent,
             back_callback=back_to_student

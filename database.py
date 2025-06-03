@@ -97,6 +97,7 @@ class Database:
                 score INTEGER,
                 date TEXT,
                 answers TEXT,
+                elapsed_seconds INTEGER,
                 FOREIGN KEY (user_id) REFERENCES USERS(id),
                 FOREIGN KEY (theme_id) REFERENCES THEME(id)
             )"""
