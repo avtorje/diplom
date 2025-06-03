@@ -44,7 +44,10 @@ class AdminForm(tk.Tk):
 
     def open_form(self, form_class):
         self.withdraw()
-        form_class(self).mainloop()
+        if form_class == ManageTestsForm:
+            form_class(self, self.admin_id).mainloop()
+        else:
+            form_class(self).mainloop()
 
     def go_back(self, _=None):
         if messagebox.askyesno("Вернуться", "Вы уверены, что хотите вернуться в меню регистрации?"):

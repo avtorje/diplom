@@ -5,10 +5,11 @@ from edit_test_form import EditTestForm
 from group_select_dialog import GroupSelectDialog
 
 class ManageTestsForm(tk.Toplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, current_user_id):
         super().__init__(parent)
         self.db = Database()
         self.parent = parent
+        self.current_user_id = current_user_id
         self.title("Управление тестами")
         self.geometry("400x400")
         self.center_window()
