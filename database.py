@@ -106,14 +106,27 @@ class Database:
             self._execute(table)
 
     # --- Пользователи ---
-    def add_user(self, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
-        try:
+    def add_student(self, first_name, last_name, group_id=None):
+            """
+            Добавить пользователя-студента. Для студента НЕ нужен username, пароль или отчество.
+            """
             self._execute(
-                "INSERT INTO USERS (username, password, role, group_id, first_name, last_name, middle_name) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (username, self.hash_password(password), role, group_id, first_name, last_name, middle_name)
+                "INSERT INTO USERS (username, password, role, group_id, first_name, last_name) VALUES (?, ?, ?, ?, ?, ?)",
+                (None, None, "student", group_id, first_name, last_name)
             )
-        except sqlite3.IntegrityError:
-            raise ValueError("Пользователь с таким именем уже существует")
+
+    def add_admin(self, username, first_name, last_name, password, group_id=None):
+        """
+        Добавить пользователя-преподавателя (админ). Для админа ОБЯЗАТЕЛЬНЫ: username, пароль, имя, фамилия.
+        """
+        if not username or not password:
+            raise ValueError("Логин и пароль обязательны для преподавателя.")
+        if self.fetch_one("SELECT 1 FROM USERS WHERE username = ?", (username,)):
+            raise ValueError("Пользователь с таким логином уже существует.")
+        self._execute(
+            "INSERT INTO USERS (username, password, role, group_id, first_name, last_name) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, self.hash_password(password), "admin", group_id, first_name, last_name)
+        )
 
     def update_user(self, user_id, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
         fields = ["username=?", "role=?", "group_id=?", "first_name=?", "last_name=?", "middle_name=?"]
