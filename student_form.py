@@ -1,7 +1,9 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter import messagebox
 from database import Database
 from result_form import ResultForm
+from journal_window import JournalWindow
 
 class StudentForm(tk.Toplevel):
     def __init__(self, user_id, username):
@@ -48,9 +50,10 @@ class StudentForm(tk.Toplevel):
         TestSelectionForm(self, self.user_id, student_form=self).mainloop()
 
     def open_journal(self):
-        self.withdraw()
-        ResultForm(self, self.user_id).mainloop()
-        self.deiconify()
+        try:
+            JournalWindow(self, self.db, self.user_id)  # Исправлено на self.user_id
+        except Exception as e:
+            messagebox.showerror("Ошибка", str(e))
 
     def go_back(self):
         self.destroy()

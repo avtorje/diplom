@@ -66,7 +66,9 @@ class Database:
             """CREATE TABLE IF NOT EXISTS THEME (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
-                timer_seconds INTEGER
+                timer_seconds INTEGER,
+                author_id INTEGER,  -- добавлено поле для автора
+                FOREIGN KEY (author_id) REFERENCES USERS(id)
             )""",
             """CREATE TABLE IF NOT EXISTS THEME_GROUP (
                 theme_id INTEGER,
@@ -389,3 +391,20 @@ class Database:
         """
         rows = self._execute(query, (group_id, user_id), fetch=True)
         return [{"id": r["id"], "name": r["name"], "timer_seconds": r["timer_seconds"]} for r in rows]
+    
+    def get_journal_for_user(self, user_id):
+        query = """
+            SELECT
+                ts.id,
+                ts.score,
+                ts.date,
+                th.name as test_name,
+                th.timer_seconds,
+                (u.last_name || ' ' || u.first_name || ' ' || IFNULL(u.middle_name, '')) AS teacher_name
+            FROM TEST_SUMMARY ts
+            JOIN THEME th ON ts.theme_id = th.id
+            LEFT JOIN USERS u ON th.author_id = u.id
+            WHERE ts.user_id = ?
+            ORDER BY ts.date DESC
+        """
+        return self._execute(query, (user_id,), fetch=True)

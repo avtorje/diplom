@@ -157,5 +157,13 @@ class TestForm(tk.Toplevel):
             self.destroy()  # Закрыть окно теста
             self.student_form.deiconify()  # Показать панель студента
         from test_result_window import TestResultWindow
-        TestResultWindow(self, time_seconds=time_seconds, percent=percent, back_callback=back_to_student)
+        TestResultWindow(
+            self,
+            db=self.db,
+            user_id=self.user_id,
+            theme_id=self.test_id,  # <-- исправлено!
+            time_seconds=time_seconds,
+            percent=percent,
+            back_callback=back_to_student
+        )
         self.withdraw()  # Скрыть форму теста на время показа результатов

@@ -1,7 +1,8 @@
 import tkinter as tk
+import datetime
 
 class TestResultWindow(tk.Toplevel):
-    def __init__(self, parent, time_seconds=None, percent=0, back_callback=None):
+    def __init__(self, parent, db, user_id, theme_id, time_seconds=None, percent=0, back_callback=None):
         super().__init__(parent)
         self.title("Результаты теста")
         self.geometry("350x220")
@@ -9,14 +10,17 @@ class TestResultWindow(tk.Toplevel):
         self.configure(bg="#f0f0f0")
         self.grab_set()
 
-        self.lift()  # Поднять окно над остальными
-        self.attributes('-topmost', True)  # Сделать окно поверх всех
+        self.lift()
+        self.attributes('-topmost', True)
+        self.center_window()
 
-        self.center_window()  # <--- ВЫЗЫВАТЬ ПОСЛЕ lift() и attributes()
+        self.back_callback = back_callback
+        self.db = db
+        self.user_id = user_id
+        self.theme_id = theme_id
+        self.percent = percent
+        self.time_seconds = time_seconds
 
-        self.back_callback = back_callback  # Сохраняем колбэк для возврата
-
-        # Заголовок по центру
         label_title = tk.Label(self, text="Тест завершён!", font=("Arial", 16, "bold"),
                               bg="#f0f0f0", anchor="center", justify="center")
         label_title.pack(pady=(24, 12))
@@ -35,10 +39,27 @@ class TestResultWindow(tk.Toplevel):
                         command=self._on_back)
         btn.pack(pady=0)
 
+        # Сохраняем результат теста сразу при открытии окна (или можно по кнопке)
+        self.save_result()
+
+    def save_result(self):
+        date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Сохраняем в базу: user_id, theme_id, score, date, answers (""), время прохождения, если есть поле elapsed_seconds
+        params = [self.user_id, self.theme_id, int(self.percent), date_str, ""]
+        query = "INSERT INTO TEST_SUMMARY (user_id, theme_id, score, date, answers"
+        if self.time_seconds is not None:
+            query += ", elapsed_seconds"
+            params.append(int(self.time_seconds))
+        query += ") VALUES (?, ?, ?, ?, ?"
+        if self.time_seconds is not None:
+            query += ", ?"
+        query += ")"
+        self.db._execute(query, tuple(params))
+
     def _on_back(self):
-        self.destroy()  # Закрыть окно результатов
+        self.destroy()
         if self.back_callback:
-            self.back_callback()  # Вернуть на панель студента
+            self.back_callback()
 
     def center_window(self):
         self.update_idletasks()
