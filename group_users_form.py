@@ -74,10 +74,10 @@ class GroupUsersForm(tk.Toplevel):
         self.student_ids = []
 
         admins = self.db.get_admins_by_group(self.group_id)
-        # DEBUG: print(admins)  # убрать после отладки
 
         for idx, admin in enumerate(admins, 1):
             label = f"{idx}. {admin['last_name']} {admin['first_name']} ({admin['username']})"
+            print(f"DEBUG {idx=}, {label=}")
             self.admins_listbox.insert(tk.END, label)
             self.admin_ids.append(admin['id'])
 

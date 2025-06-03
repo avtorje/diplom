@@ -120,9 +120,9 @@ class ManageUsersForm(tk.Toplevel):
             )
         self.admins_listbox.delete(0, tk.END)
         admins = self.db.fetch_all("SELECT id, username, first_name, last_name FROM USERS WHERE role='admin' AND username!='admin'")
-        for a in admins:
+        for idx, a in enumerate(admins, 1):
             self.admins_listbox.insert(
-                tk.END, f"{a['id']}: {a['last_name']} {a['first_name']} ({a['username']})"
+                tk.END, f"{idx}. {a['last_name']} {a['first_name']} ({a['username']})"
             )
 
     def add_admin(self):
