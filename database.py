@@ -6,10 +6,9 @@ class Database:
     def __init__(self, db_path: str = "database.db"):
         self.db_path = db_path
         self.conn = sqlite3.connect(self.db_path)
-        self.conn.row_factory = sqlite3.Row  # Позволяет получать строки как словари
+        self.conn.row_factory = sqlite3.Row
         self.initialize()
 
-    # --- Вспомогательные методы ---
     def _execute(self, query, params=(), fetch=False, many=False):
         cur = self.conn.cursor()
         if many:
@@ -54,20 +53,27 @@ class Database:
             )""",
             """CREATE TABLE IF NOT EXISTS USERS (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
+                username TEXT UNIQUE,
                 password TEXT,
                 role TEXT NOT NULL,
                 first_name TEXT,
                 last_name TEXT,
                 middle_name TEXT,
-                group_id INTEGER,
+                group_id INTEGER, -- только для студентов!
                 FOREIGN KEY (group_id) REFERENCES GROUPS(id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS ADMIN_GROUP (
+                admin_id INTEGER,
+                group_id INTEGER,
+                FOREIGN KEY(admin_id) REFERENCES USERS(id),
+                FOREIGN KEY(group_id) REFERENCES GROUPS(id),
+                PRIMARY KEY(admin_id, group_id)
             )""",
             """CREATE TABLE IF NOT EXISTS THEME (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 timer_seconds INTEGER,
-                author_id INTEGER,  -- добавлено поле для автора
+                author_id INTEGER,
                 FOREIGN KEY (author_id) REFERENCES USERS(id)
             )""",
             """CREATE TABLE IF NOT EXISTS THEME_GROUP (
@@ -106,26 +112,20 @@ class Database:
             self._execute(table)
 
     # --- Пользователи ---
-    def add_student(self, first_name, last_name, group_id=None):
-            """
-            Добавить пользователя-студента. Для студента НЕ нужен username, пароль или отчество.
-            """
-            self._execute(
-                "INSERT INTO USERS (username, password, role, group_id, first_name, last_name) VALUES (?, ?, ?, ?, ?, ?)",
-                (None, None, "student", group_id, first_name, last_name)
-            )
+    def add_student(self, first_name, last_name, group_id):
+        self._execute(
+            "INSERT INTO USERS (username, password, role, group_id, first_name, last_name) VALUES (?, ?, ?, ?, ?, ?)",
+            (None, None, "student", group_id, first_name, last_name)
+        )
 
-    def add_admin(self, username, first_name, last_name, password, group_id=None):
-        """
-        Добавить пользователя-преподавателя (админ). Для админа ОБЯЗАТЕЛЬНЫ: username, пароль, имя, фамилия.
-        """
+    def add_admin(self, username, first_name, last_name, password):
         if not username or not password:
             raise ValueError("Логин и пароль обязательны для преподавателя.")
         if self.fetch_one("SELECT 1 FROM USERS WHERE username = ?", (username,)):
             raise ValueError("Пользователь с таким логином уже существует.")
         self._execute(
-            "INSERT INTO USERS (username, password, role, group_id, first_name, last_name) VALUES (?, ?, ?, ?, ?, ?)",
-            (username, self.hash_password(password), "admin", group_id, first_name, last_name)
+            "INSERT INTO USERS (username, password, role, group_id, first_name, last_name) VALUES (?, ?, ?, NULL, ?, ?)",
+            (username, self.hash_password(password), "admin", first_name, last_name)
         )
 
     def update_user(self, user_id, username, password, role, group_id=None, first_name=None, last_name=None, middle_name=None):
@@ -142,6 +142,7 @@ class Database:
 
     def delete_user(self, user_id):
         self._execute("DELETE FROM USERS WHERE id=?", (user_id,))
+        self._execute("DELETE FROM ADMIN_GROUP WHERE admin_id=?", (user_id,))  # очистить связи если это преподаватель
 
     def get_user(self, **kwargs):
         if not kwargs:
@@ -175,70 +176,46 @@ class Database:
             }
             for r in rows
         ]
-    
-    def get_user_by_name_and_group(self, username, group_id):
-        return self.fetch_one(
-            "SELECT * FROM USERS WHERE username = ? AND group_id = ?",
-            (username, group_id)
-        )
-    
-    def get_user_group_id(self, user_id):
-        result = self.fetch_one(
-            "SELECT group_id FROM USERS WHERE id = ?",
-            (user_id,)
-        )
-        return result["group_id"] if result else None
-    
+
     def get_user_by_id(self, user_id):
-        # Если вы возвращаете словарь (а не кортеж), используйте row_factory=sqlite3.Row или дополнительное преобразование
         return self.fetch_one(
             "SELECT id, username, role, group_id FROM USERS WHERE id = ?",
             (user_id,)
         )
-    
+
+    # --- Преподаватели и группы (многие-ко-многим) ---
+    def add_admin_to_group(self, admin_id, group_id):
+        self._execute(
+            "INSERT OR IGNORE INTO ADMIN_GROUP (admin_id, group_id) VALUES (?, ?)",
+            (admin_id, group_id)
+        )
+
+    def remove_admin_from_group(self, admin_id, group_id):
+        self._execute(
+            "DELETE FROM ADMIN_GROUP WHERE admin_id=? AND group_id=?",
+            (admin_id, group_id)
+        )
+
     def get_admins_by_group(self, group_id):
-        # Возвращает список словарей с пользователями-админами этой группы
-        return self.fetch_all(
-            "SELECT id, username FROM USERS WHERE group_id = ? AND role = 'admin'",
-            (group_id,)
+        rows = self._execute(
+            "SELECT u.id, u.username, u.first_name, u.last_name FROM ADMIN_GROUP ag JOIN USERS u ON ag.admin_id = u.id WHERE ag.group_id=?",
+            (group_id,), fetch=True
         )
+        return [dict(r) for r in rows]
 
+    def get_groups_by_admin(self, admin_id):
+        rows = self._execute(
+            "SELECT g.id, g.name FROM ADMIN_GROUP ag JOIN GROUPS g ON ag.group_id = g.id WHERE ag.admin_id=?",
+            (admin_id,), fetch=True
+        )
+        return [dict(r) for r in rows]
+
+    # --- Студенты и группы (один-ко-многим) ---
     def get_students_by_group(self, group_id):
-        # Возвращает список словарей с пользователями-студентами этой группы
         return self.fetch_all(
-            "SELECT id, username FROM USERS WHERE group_id = ? AND role = 'student'",
+            "SELECT id, first_name, last_name FROM USERS WHERE group_id = ? AND role = 'student'",
             (group_id,)
         )
-
-    def check_admin_password(self, admin_id, password):
-        row = self.fetch_one("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
-        return row and row["password"] == self.hash_password(password)
-
-    def update_admin_password(self, admin_id, new_password):
-        self._execute("UPDATE USERS SET password=? WHERE id=? AND role='admin'", (self.hash_password(new_password), admin_id))
-
-    def validate_user(self, username, password):
-        row = self.fetch_one(
-            "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE username = ? AND password = ?",
-            (username, self.hash_password(password))
-        )
-        if row:
-            return {
-                "id": row["id"], "username": row["username"], "role": row["role"], "group_id": row["group_id"],
-                "first_name": row["first_name"], "last_name": row["last_name"], "middle_name": row["middle_name"]
-            }
-        return None
-
-    def get_main_admin(self):
-        row = self.fetch_one("SELECT id, username, first_name, last_name, middle_name FROM USERS WHERE username='admin' AND role='admin'")
-        if row:
-            return {
-                "id": row["id"], "username": row["username"], "first_name": row["first_name"],
-                "last_name": row["last_name"], "middle_name": row["middle_name"]
-            }
-        return None
-
-    # --- Группы ---
     def get_groups(self):
         rows = self._execute("SELECT id, name FROM GROUPS ORDER BY id ASC", fetch=True)
         return [{"id": r["id"], "name": r["name"]} for r in rows]
