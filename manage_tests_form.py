@@ -60,14 +60,14 @@ class ManageTestsForm(tk.Toplevel):
         group_ids = [groups[i]["id"] for i in dlg.selected]
 
         try:
-            # Добавляем тест без таймера по умолчанию
-            test_id = self.db.add_test(test_name, timer_seconds=None)
+            # --- ВАЖНО: передаём self.current_user_id как author_id ---
+            test_id = self.db.add_test(test_name, self.current_user_id, timer_seconds=None)
             self.db.add_test_groups(test_id, group_ids)
             self.load_tests()
             messagebox.showinfo("Успешно", f"Тест '{test_name}' успешно добавлен для выбранных групп.")
 
             # Открыть окно редактирования теста (добавления вопросов и настройки таймера)
-            self.withdraw()  # скрыть главное окно, если нужно
+            self.withdraw()
             EditTestForm(self, test_id).mainloop()
         except ValueError as e:
             messagebox.showerror("Ошибка", str(e))

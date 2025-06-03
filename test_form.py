@@ -65,7 +65,6 @@ class TestForm(tk.Toplevel):
             else:
                 self.answers.append(-1)
         score = self.calculate_score()
-        self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
         percent = (score / len(self.questions)) * 100 if self.questions else 0
         total_time = self.timer_seconds
         self.show_result_window(total_time, percent)
@@ -180,7 +179,6 @@ class TestForm(tk.Toplevel):
                 return
             self.answers.append(sel)
         score = self.calculate_score()
-        self.db.save_test_results(self.user_id, self.test_id, self.questions, self.answers, score)
         percent = (score / len(self.questions)) * 100 if self.questions else 0
         # Время прохождения теста
         if self.timer_seconds:

@@ -86,12 +86,12 @@ class JournalWindow(tk.Toplevel):
         for r in results:
             mark = calc_mark(r["score"])
             timer_display = format_timer(r["timer_seconds"])
-            answers_time = ""  # если нужно
+            answers_time = r.get("elapsed_seconds", "") or ""  # новое!
             self.tree.insert(
                 "", "end",
                 values=(
                     r["test_name"],
-                    r["teacher_name"] if "teacher_name" in r.keys() else "",
+                    r.get("teacher_name", ""),
                     r["date"],
                     r["score"],
                     mark,

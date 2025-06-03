@@ -284,9 +284,9 @@ class Database:
             return {"id": row["id"], "name": row["name"], "timer_seconds": row["timer_seconds"]}
         return None
 
-    def add_test(self, test_name, timer_seconds=None):
+    def add_test(self, test_name, author_id, timer_seconds=None):
         try:
-            self._execute("INSERT INTO THEME (name, timer_seconds) VALUES (?, ?)", (test_name, timer_seconds))
+            self._execute("INSERT INTO THEME (name, author_id, timer_seconds) VALUES (?, ?, ?)", (test_name, author_id, timer_seconds))
             return self.fetch_one("SELECT id FROM THEME WHERE name = ?", (test_name,))["id"]
         except sqlite3.IntegrityError:
             raise ValueError("Тест с таким названием уже существует.")
@@ -401,6 +401,7 @@ class Database:
                 ts.date,
                 th.name as test_name,
                 th.timer_seconds,
+                ts.elapsed_seconds,  -- ДОБАВИТЬ
                 (u.last_name || ' ' || u.first_name || ' ' || IFNULL(u.middle_name, '')) AS teacher_name
             FROM TEST_SUMMARY ts
             JOIN THEME th ON ts.theme_id = th.id
