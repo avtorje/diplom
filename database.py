@@ -39,7 +39,7 @@ class Database:
     def initialize(self):
         self._create_tables()
         if not self.fetch_one("SELECT 1 FROM USERS WHERE username='admin'"):
-            self.add_user("admin", "admin123", "admin", first_name="Admin", last_name="User")
+            self.add_admin("admin", "Admin", "User", "admin123")
         if not self._column_exists("THEME", "timer_seconds"):
             self._execute("ALTER TABLE THEME ADD COLUMN timer_seconds INTEGER")
         if not self._column_exists("TEST_SUMMARY", "answers"):
