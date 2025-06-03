@@ -11,13 +11,13 @@ class UserForm(tk.Toplevel):
         self.role = role
         self.groups = self.db.get_groups()
         self.title(title)
-        self.center_window(400, 300)
+        self.center_window(400, 220)
         self.parent = parent
         self.create_widgets()
         if user_id:
             self.load_user()
 
-    def center_window(self, width=400, height=300):
+    def center_window(self, width=400, height=220):
         self.update_idletasks()
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -26,23 +26,28 @@ class UserForm(tk.Toplevel):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
     def create_widgets(self):
-        tk.Label(self, text="Имя:").pack()
-        self.first_name_entry = tk.Entry(self)
-        self.first_name_entry.pack()
+        pad = {"padx": 10, "pady": 5}
+        frm = tk.Frame(self)
+        frm.pack(fill=tk.BOTH, expand=True, **pad)
 
-        tk.Label(self, text="Фамилия:").pack()
-        self.last_name_entry = tk.Entry(self)
-        self.last_name_entry.pack()
+        tk.Label(frm, text="Имя:").grid(row=0, column=0, sticky="e", **pad)
+        self.first_name_entry = tk.Entry(frm)
+        self.first_name_entry.grid(row=0, column=1, **pad)
 
-        tk.Label(self, text="Группа:").pack()
+        tk.Label(frm, text="Фамилия:").grid(row=1, column=0, sticky="e", **pad)
+        self.last_name_entry = tk.Entry(frm)
+        self.last_name_entry.grid(row=1, column=1, **pad)
+
+        tk.Label(frm, text="Группа:").grid(row=2, column=0, sticky="e", **pad)
         group_names = [g['name'] for g in self.groups]
-        self.group_combobox = ttk.Combobox(self, values=group_names, state="readonly")
-        self.group_combobox.pack()
+        self.group_combobox = ttk.Combobox(frm, values=group_names, state="readonly")
+        self.group_combobox.grid(row=2, column=1, **pad)
         if self.forced_group_id:
             self.group_combobox.set(self.get_group_name(self.forced_group_id))
             self.group_combobox["state"] = "disabled"
 
-        tk.Button(self, text="Сохранить", command=self.save_user).pack(pady=10)
+        btn = tk.Button(frm, text="Сохранить", command=self.save_user)
+        btn.grid(row=3, column=0, columnspan=2, pady=(15, 5))
 
     def get_group_name(self, group_id):
         return next((g['name'] for g in self.groups if g['id'] == group_id), "")

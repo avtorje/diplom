@@ -234,12 +234,22 @@ class Database:
         )
         return [dict(r) for r in rows]
 
-    def get_groups_by_admin(self, admin_id):
+    def get_groups_for_admin(self, admin_id):
         rows = self._execute(
             "SELECT g.id, g.name FROM ADMIN_GROUP ag JOIN GROUPS g ON ag.group_id = g.id WHERE ag.admin_id=?",
             (admin_id,), fetch=True
         )
-        return [dict(r) for r in rows]
+        return [{"id": r["id"], "name": r["name"]} for r in rows]
+    
+    def get_full_group_members(self, group_id):
+        # Студенты
+        students = self.fetch_all(
+            "SELECT id, first_name, last_name FROM USERS WHERE group_id = ? AND role = 'student'",
+            (group_id,)
+        )
+        # Преподаватели
+        teachers = self.get_admins_by_group(group_id)
+        return {"students": students, "teachers": teachers}
 
     # --- Студенты и группы (один-ко-многим) ---
     def get_students_by_group(self, group_id):
@@ -247,9 +257,19 @@ class Database:
             "SELECT id, first_name, last_name FROM USERS WHERE group_id = ? AND role = 'student'",
             (group_id,)
         )
+    
+    def import_students_from_file(self, file_path, group_id):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = [line.strip() for line in f if line.strip()]
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 2:
+                    last_name, first_name = parts[0], parts[1]
+                    self.add_student(first_name, last_name, group_id)
+                    
     def get_groups(self):
-        rows = self._execute("SELECT id, name FROM GROUPS ORDER BY id ASC", fetch=True)
-        return [{"id": r["id"], "name": r["name"]} for r in rows]
+        rows = self._execute("SELECT id, name, access_code FROM GROUPS ORDER BY id ASC", fetch=True)
+        return [{"id": r["id"], "name": r["name"], "access_code": r["access_code"]} for r in rows]
     
     def get_group_by_name(self, group_name):
         return self.fetch_one(
