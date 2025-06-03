@@ -107,6 +107,7 @@ class ManageUsersForm(tk.Toplevel):
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=5)
         tk.Button(btn_frame, text="Добавить преподавателя", command=self.add_admin).pack(pady=5, fill=tk.X)
+        tk.Button(btn_frame, text="Удалить преподавателя", command=self.delete_admin).pack(pady=5, fill=tk.X)
         tk.Button(btn_frame, text="Назначить в группы", command=self.assign_admin_to_groups).pack(pady=5, fill=tk.X)
         tk.Button(btn_frame, text="Управление группами", command=self.open_groups_form).pack(pady=5, fill=tk.X)
         tk.Button(btn_frame, text="Назад", command=self.go_back).pack(pady=5, fill=tk.X)
@@ -136,13 +137,38 @@ class ManageUsersForm(tk.Toplevel):
             except Exception as e:
                 messagebox.showerror("Ошибка", str(e))
 
+    def delete_admin(self):
+        idx = self.admins_listbox.curselection()
+        if not idx:
+            messagebox.showwarning("Внимание", "Выберите преподавателя для удаления.")
+            return
+        admin_str = self.admins_listbox.get(idx[0])
+        admin_id = None
+        if ':' in admin_str:
+            admin_id = int(admin_str.split(':')[0])
+        else:
+            admins = self.db.fetch_all("SELECT id, username, first_name, last_name FROM USERS WHERE role='admin' AND username!='admin'")
+            if idx[0] < len(admins):
+                admin_id = admins[idx[0]]["id"]
+        if not admin_id:
+            messagebox.showerror("Ошибка", "Не удалось определить преподавателя.")
+            return
+        if messagebox.askyesno("Удаление", "Удалить выбранного преподавателя?"):
+            try:
+                self.db.delete_user(admin_id)
+                self.load_admins()
+                messagebox.showinfo("Успешно", "Преподаватель удалён.")
+            except Exception as e:
+                messagebox.showerror("Ошибка", str(e))
+
     def assign_admin_to_groups(self):
         idx = self.admins_listbox.curselection()
         if not idx:
             messagebox.showwarning("Внимание", "Выберите преподавателя.")
             return
-        admin_str = self.admins_listbox.get(idx[0])
-        admin_id = int(admin_str.split(":")[0])
+        # Получите список преподавателей в том же порядке, что и в Listbox
+        admins = self.db.fetch_all("SELECT id, username, first_name, last_name FROM USERS WHERE role='admin' AND username!='admin'")
+        admin_id = admins[idx[0]]["id"]
         AddAdminToGroupsDialog(self, admin_id, self.db)
         self.load_admins()
 
