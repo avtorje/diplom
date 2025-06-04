@@ -3,22 +3,31 @@ from tkinter import messagebox, simpledialog
 from database import Database
 
 class EditTestForm(tk.Toplevel):
-    def __init__(self, parent, test_id):
+    def __init__(self, parent, test_id, current_user_id):
         super().__init__(parent)
         self.db = Database()
         self.test_id = test_id
+        self.current_user_id = current_user_id
         self.parent = parent
         self.title("Редактирование теста")
-        self.geometry("500x500")
+        self.geometry("500x650")
         self.center_window()
         self.create_widgets()
-        self.initialized = False  # Флаг для предотвращения повторной инициализации
-        self.load_test_timer()
+        self.initialized = False
+        self.load_test_info()
         self.load_questions()
         self.initialized = True
 
     def create_widgets(self):
         tk.Label(self, text="Редактирование теста", font=("Arial", 16)).pack(pady=10)
+
+        # --- Название теста ---
+        name_frame = tk.Frame(self)
+        name_frame.pack(pady=5)
+        tk.Label(name_frame, text="Название теста:").pack(side="left")
+        self.name_var = tk.StringVar()
+        self.name_entry = tk.Entry(name_frame, textvariable=self.name_var, width=30)
+        self.name_entry.pack(side="left", padx=(5, 10))
 
         # --- Таймер теста ---
         timer_frame = tk.Frame(self)
@@ -27,14 +36,22 @@ class EditTestForm(tk.Toplevel):
         self.timer_var = tk.StringVar()
         self.timer_entry = tk.Entry(timer_frame, textvariable=self.timer_var, width=6)
         self.timer_entry.pack(side="left", padx=(0, 10))
-        # Всегда по умолчанию "убрать таймер", даже после возврата через "Назад"
         self.timer_check = tk.IntVar(value=1)
         self.timer_remove = tk.Checkbutton(timer_frame, text="Убрать таймер", variable=self.timer_check, command=self.toggle_timer)
         self.timer_remove.pack(side="left")
         tk.Button(timer_frame, text="Сохранить таймер", command=self.save_timer).pack(side="left", padx=5)
-        self.toggle_timer()  # Гарантируем начальное состояние
+
+        # --- Группы ---
+        tk.Label(self, text="Назначить тест в группы:").pack(pady=(10, 0))
+        self.groups_frame = tk.Frame(self)
+        self.groups_frame.pack(padx=10, pady=5, fill=tk.X)
+        self.group_vars = []
+
+        # --- Применить изменения по тесту ---
+        tk.Button(self, text="Сохранить параметры теста", command=self.save_test_params).pack(pady=5)
 
         # --- Вопросы ---
+        tk.Label(self, text="Вопросы теста:", font=("Arial", 14)).pack(pady=(10, 2))
         self.questions_listbox = tk.Listbox(self)
         self.questions_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
         actions = [
@@ -45,25 +62,68 @@ class EditTestForm(tk.Toplevel):
             ("Назад", self.go_back)
         ]
         for text, cmd in actions:
-            tk.Button(self, text=text, command=cmd).pack(pady=5)
+            tk.Button(self, text=text, command=cmd).pack(pady=3)
 
-    def load_test_timer(self):
+    def load_test_info(self):
+        # Название и таймер
         theme = self.db.get_theme(self.test_id)
-        # Если тест новый или timer_seconds не задан — всегда "убрать таймер"
-        if theme and theme["timer_seconds"] is not None and theme["timer_seconds"] > 0:
-            self.timer_var.set(str(theme["timer_seconds"] // 60))
-            self.timer_check.set(0)
+        if theme:
+            self.name_var.set(theme["name"])
+            if theme["timer_seconds"] is not None and theme["timer_seconds"] > 0:
+                self.timer_var.set(str(theme["timer_seconds"] // 60))
+                self.timer_check.set(0)
+            else:
+                self.timer_var.set("")
+                self.timer_check.set(1)
         else:
+            self.name_var.set("")
             self.timer_var.set("")
             self.timer_check.set(1)
-        # toggle_timer должен вызываться только после корректной установки timer_check!
         self.toggle_timer()
 
+        # Группы
+        test_groups = set(
+            row["group_id"] for row in self.db._execute(
+                "SELECT group_id FROM THEME_GROUP WHERE theme_id=?", (self.test_id,), fetch=True)
+        )
+        available_groups = self.db.get_available_groups_for_admin(self.current_user_id)
+        for widget in self.groups_frame.winfo_children():
+            widget.destroy()
+        self.group_vars = []
+        for group in available_groups:
+            var = tk.BooleanVar(value=group["id"] in test_groups)
+            cb = tk.Checkbutton(self.groups_frame, text=group["name"], variable=var)
+            cb.pack(anchor="w")
+            self.group_vars.append((var, group["id"]))
+
+    def save_test_params(self):
+        # Название
+        name = self.name_var.get().strip()
+        if not name:
+            messagebox.showerror("Ошибка", "Название теста не может быть пустым.", parent=self)
+            return
+        # Группы
+        new_group_ids = [gid for var, gid in self.group_vars if var.get()]
+        if not new_group_ids:
+            messagebox.showerror("Ошибка", "Выберите хотя бы одну группу.", parent=self)
+            return
+        try:
+            self.db._execute("UPDATE THEME SET name=? WHERE id=?", (name, self.test_id))
+            self.db.update_test_groups(self.test_id, new_group_ids, self.current_user_id)
+            messagebox.showinfo("Успешно", "Параметры теста успешно обновлены.", parent=self)
+        except Exception as e:
+            messagebox.showerror("Ошибка", str(e), parent=self)
+
+    def load_questions(self):
+        self.questions = self.db.get_questions(self.test_id)
+        self.questions_listbox.delete(0, tk.END)
+        for q in self.questions:
+            self.questions_listbox.insert(tk.END, f"{q['theme_local_number']}: {q['text']}")
+
     def toggle_timer(self):
-        # Обеспечивает корректную работу поля таймера при изменении чекбокса
         if self.timer_check.get():
             self.timer_entry.configure(state='disabled')
-            self.timer_var.set("")  # очищаем значение, когда таймер убран
+            self.timer_var.set("")
         else:
             self.timer_entry.configure(state='normal')
 
@@ -80,15 +140,9 @@ class EditTestForm(tk.Toplevel):
                 timer_seconds = mins * 60
             self.db.update_test(self.test_id, self.db.get_test_name(self.test_id), timer_seconds)
             messagebox.showinfo("Успешно", "Таймер теста сохранён.", parent=self)
-            self.load_test_timer()
+            self.load_test_info()
         except Exception:
             messagebox.showerror("Ошибка", "Введите корректное значение таймера (целое число минут > 0) либо уберите таймер.", parent=self)
-
-    def load_questions(self):
-        self.questions = self.db.get_questions(self.test_id)
-        self.questions_listbox.delete(0, tk.END)
-        for q in self.questions:
-            self.questions_listbox.insert(tk.END, f"{q['theme_local_number']}: {q['text']}")
 
     def ask_question_data(self, default_text="", default_options=None, default_correct=None):
         q_text = self.open_input_dialog("Вопрос", "Введите текст вопроса:", default_text)
@@ -139,12 +193,11 @@ class EditTestForm(tk.Toplevel):
                 return
             self.db.add_question(self.test_id, q_text, options, correct)
             self.load_questions()
-            # выделяем последний вопрос
-            last_idx = len(self.questions) - 1
-            if last_idx >= 0:
+            last_idx = len(self.questions)
+            if last_idx > 0:
                 self.questions_listbox.selection_clear(0, tk.END)
-                self.questions_listbox.selection_set(last_idx)
-                self.questions_listbox.activate(last_idx)
+                self.questions_listbox.selection_set(last_idx - 1)
+                self.questions_listbox.activate(last_idx - 1)
             messagebox.showinfo("Вопрос добавлен", f"Вопрос успешно добавлен:\n\n{q_text}", parent=self)
         except Exception as e:
             messagebox.showerror("Ошибка", str(e), parent=self)
@@ -187,7 +240,6 @@ class EditTestForm(tk.Toplevel):
         resize_after_id = None
         win.bind("<Configure>", update_wraplength_delayed)
 
-        # Заголовок вопроса
         q_label = tk.Label(
             frame, text=q['text'], font=("Arial", 14),
             background="#f0f0f0", justify="center", anchor="center", wraplength=360
@@ -195,7 +247,6 @@ class EditTestForm(tk.Toplevel):
         q_label.grid(row=0, column=0, pady=(10, 5), sticky="n")
         all_dynamic_labels.append(q_label)
 
-        # "Варианты ответов"
         opt_title = tk.Label(
             frame, text="Варианты ответов:", font=("Arial", 12),
             background="#f0f0f0", justify="center", anchor="center", wraplength=360
@@ -221,7 +272,6 @@ class EditTestForm(tk.Toplevel):
             all_dynamic_labels.append(no_opt)
             next_row = 3
 
-        # "Правильные ответы"
         corr_title = tk.Label(
             frame, text="Правильные ответы:", font=("Arial", 12),
             background="#f0f0f0", justify="center", anchor="center", wraplength=360
@@ -308,7 +358,6 @@ class EditTestForm(tk.Toplevel):
                 self.db.update_theme_local_number(q['id'], idx+1)
 
     def go_back(self):
-        # При возврате всегда очищаем и инициализируем переменные таймера заново!
         self.destroy()
         if self.parent:
             self.parent.deiconify()

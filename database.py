@@ -471,3 +471,45 @@ class Database:
             ORDER BY ts.date DESC
         """
         return self._execute(query, (user_id,), fetch=True)
+    
+    def get_tests_for_group(self, group_id):
+        rows = self._execute(
+            "SELECT t.id, t.name, t.timer_seconds FROM THEME t "
+            "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
+        )
+        return [
+            {"id": r["id"], "name": r["name"], "timer_seconds": r["timer_seconds"]}
+            for r in rows
+        ]
+
+    # Новый: Создание теста и назначение на несколько групп с проверкой доступа
+    def add_test_with_groups(self, test_name, author_id, group_ids, timer_seconds=None):
+        # Разрешённые группы
+        available_ids = set(g['id'] for g in self.get_available_groups_for_admin(author_id))
+        for gid in group_ids:
+            if gid not in available_ids:
+                raise ValueError("Вы не можете создать тест для группы, в которую не назначены.")
+        self._execute("INSERT INTO THEME (name, author_id, timer_seconds) VALUES (?, ?, ?)",
+                      (test_name, author_id, timer_seconds))
+        test_id = self.fetch_one("SELECT id FROM THEME WHERE name = ? AND author_id = ?", (test_name, author_id))["id"]
+        for gid in group_ids:
+            self._execute("INSERT INTO THEME_GROUP (theme_id, group_id) VALUES (?, ?)", (test_id, gid))
+        return test_id
+
+    # Новый: Переназначение групп для теста (только доступные преподавателю)
+    def update_test_groups(self, test_id, new_group_ids, author_id):
+        available_ids = set(g['id'] for g in self.get_available_groups_for_admin(author_id))
+        for gid in new_group_ids:
+            if gid not in available_ids:
+                raise ValueError("Вы не можете назначить тест в группу, в которую не назначены.")
+        self._execute("DELETE FROM THEME_GROUP WHERE theme_id=?", (test_id,))
+        for gid in new_group_ids:
+            self._execute("INSERT INTO THEME_GROUP (theme_id, group_id) VALUES (?, ?)", (test_id, gid))
+
+    # Новый: Удалить тест только из одной группы (или полностью, если больше не назначен)
+    def remove_test_from_group(self, test_id, group_id):
+        self._execute("DELETE FROM THEME_GROUP WHERE theme_id=? AND group_id=?", (test_id, group_id))
+        # Если тест не назначен ни в одну группу — удалить сам тест и все вопросы/ответы
+        count = self.fetch_one("SELECT COUNT(*) as cnt FROM THEME_GROUP WHERE theme_id=?", (test_id,))["cnt"]
+        if count == 0:
+            self.delete_test(test_id)

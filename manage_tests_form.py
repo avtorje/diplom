@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 from database import Database
 from edit_test_form import EditTestForm
-from group_select_dialog import GroupSelectDialog
 
 class ManageTestsForm(tk.Toplevel):
     def __init__(self, parent, current_user_id):
@@ -10,90 +9,111 @@ class ManageTestsForm(tk.Toplevel):
         self.db = Database()
         self.parent = parent
         self.current_user_id = current_user_id
+        self.groups = self.db.get_available_groups_for_admin(self.current_user_id)
+        if not self.groups:
+            messagebox.showerror("Ошибка", "Нет доступных групп для управления тестами.")
+            self.destroy()
+            return
+        self.selected_group_idx = 0
         self.title("Управление тестами")
-        self.geometry("400x400")
+        self.geometry("500x450")
         self.center_window()
         self.create_widgets()
-        self.load_tests()
+        self.load_tests_for_selected_group()
 
     def create_widgets(self):
-        tk.Label(self, text="Управление тестами", font=("Arial", 16)).pack(pady=10)
+        # Вкладки групп сверху
+        self.tabs_frame = tk.Frame(self)
+        self.tabs_frame.pack(fill=tk.X, pady=5)
+        self.tab_buttons = []
+        for idx, group in enumerate(self.groups):
+            btn = tk.Button(self.tabs_frame, text=group["name"], relief="raised",
+                            command=lambda i=idx: self.on_group_tab(i))
+            btn.pack(side=tk.LEFT, padx=3)
+            self.tab_buttons.append(btn)
+        self.update_tab_highlight()
+
+        # Список тестов
         self.tests_listbox = tk.Listbox(self)
-        self.tests_listbox.pack(fill=tk.BOTH, expand=True, pady=5)
-        buttons = [
-            ("Добавить тест", self.add_test),
-            ("Редактировать тест", lambda: self.modify_test(EditTestForm)),
-            ("Удалить тест", self.delete_test),
-            ("Назад", self.go_back)
-        ]
-        for text, cmd in buttons:
-            tk.Button(self, text=text, command=cmd).pack(pady=5)
+        self.tests_listbox.pack(fill=tk.BOTH, expand=True, pady=5, padx=10)
+        # Кнопки управления
+        btn_frame = tk.Frame(self)
+        btn_frame.pack(fill=tk.X, pady=10)
+        tk.Button(btn_frame, text="Добавить тест", command=self.add_test).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Редактировать тест", command=self.edit_test).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Удалить тест", command=self.delete_test).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Назад", command=self.go_back).pack(side=tk.RIGHT, padx=5)
 
-    def load_tests(self):
+    def on_group_tab(self, idx):
+        self.selected_group_idx = idx
+        self.update_tab_highlight()
+        self.load_tests_for_selected_group()
+
+    def update_tab_highlight(self):
+        for i, btn in enumerate(self.tab_buttons):
+            btn.config(relief="sunken" if i == self.selected_group_idx else "raised")
+
+    def load_tests_for_selected_group(self):
         self.tests_listbox.delete(0, tk.END)
-        self.tests = self.db.get_all_tests()
-        for idx, test in enumerate(self.tests, 1):
-            name = test["name"]
+        group_id = self.groups[self.selected_group_idx]["id"]
+        self.current_tests = self.db.get_tests_for_group(group_id)
+        for idx, test in enumerate(self.current_tests, 1):
             timer = test.get("timer_seconds")
-            timer_str = f" (Время выполнения: {timer//60} мин)" if timer and timer > 0 else ""
-            self.tests_listbox.insert(tk.END, f"{idx}. {name}{timer_str}")
+            timer_str = f" (Время: {timer // 60} мин)" if timer and timer > 0 else ""
+            self.tests_listbox.insert(tk.END, f"{idx}. {test['name']}{timer_str}")
 
-    def get_selected_test_id(self):
+    def get_selected_test(self):
         selected = self.tests_listbox.curselection()
-        return self.tests[selected[0]]["id"] if selected else None
+        return self.current_tests[selected[0]] if selected else None
 
     def add_test(self):
         test_name = simpledialog.askstring("Добавить тест", "Введите название нового теста:")
         if not test_name:
             return
+        timer = simpledialog.askinteger("Время", "Введите время (минуты), 0 или пусто — без ограничения:", minvalue=0)
+        timer_seconds = None if not timer else timer * 60
 
+        # Можно выбрать сразу несколько групп, но только из доступных
+        from group_select_dialog import GroupSelectDialog
         groups = self.db.get_available_groups_for_admin(self.current_user_id)
-        if not groups:
-            messagebox.showerror("Ошибка", "Нет доступных групп.")
-            return
-
         dlg = GroupSelectDialog(self, groups)
         self.wait_window(dlg)
         if not dlg.selected:
             messagebox.showwarning("Внимание", "Не выбраны группы. Тест не будет создан.")
             return
-
         group_ids = [groups[i]["id"] for i in dlg.selected]
-
         try:
-            # --- ВАЖНО: передаём self.current_user_id как author_id ---
-            test_id = self.db.add_test(test_name, self.current_user_id, timer_seconds=None)
-            # Проверка: можно ли назначить выбранные группы этому преподавателю?
-            available_ids = set(g['id'] for g in groups)
-            for gid in group_ids:
-                if gid not in available_ids:
-                    raise ValueError("Вы не можете создать тест для группы, в которую не назначены.")
-            self.db.add_test_groups(test_id, group_ids)
-            self.load_tests()
+            test_id = self.db.add_test_with_groups(test_name, self.current_user_id, group_ids, timer_seconds)
+            self.load_tests_for_selected_group()
             messagebox.showinfo("Успешно", f"Тест '{test_name}' успешно добавлен для выбранных групп.")
-
-            # Открыть окно редактирования теста (добавления вопросов и настройки таймера)
+            # Открыть форму редактирования (добавления вопросов)
             self.withdraw()
-            EditTestForm(self, test_id).mainloop()
+            EditTestForm(self, test_id, self.current_user_id).mainloop()
+            self.deiconify()
+            self.load_tests_for_selected_group()
         except ValueError as e:
             messagebox.showerror("Ошибка", str(e))
 
-    def modify_test(self, form_class):
-        test_id = self.get_selected_test_id()
-        if not test_id:
+    def edit_test(self):
+        test = self.get_selected_test()
+        if not test:
             messagebox.showerror("Ошибка", "Выберите тест для редактирования.")
             return
+        # EditTestForm должен позволять изменять группы назначения и время, с учётом ограничений!
         self.withdraw()
-        form_class(self, test_id).mainloop()
+        EditTestForm(self, test["id"], self.current_user_id).mainloop()
+        self.deiconify()
+        self.load_tests_for_selected_group()
 
     def delete_test(self):
-        test_id = self.get_selected_test_id()
-        if not test_id:
+        test = self.get_selected_test()
+        if not test:
             messagebox.showerror("Ошибка", "Выберите тест для удаления.")
             return
-        if messagebox.askyesno("Удалить тест", "Вы уверены, что хотите удалить этот тест?"):
-            self.db.delete_test(test_id)
-            self.load_tests()
+        group_id = self.groups[self.selected_group_idx]["id"]
+        if messagebox.askyesno("Удалить тест", "Удалить этот тест только из выбранной группы? (Если тест не назначен ни в одну группу, он будет удалён полностью)"):
+            self.db.remove_test_from_group(test["id"], group_id)
+            self.load_tests_for_selected_group()
 
     def go_back(self):
         self.destroy()
