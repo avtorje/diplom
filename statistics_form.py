@@ -22,7 +22,7 @@ class StatisticsForm(tk.Toplevel):
         self.db = Database()
         self.admin_id = admin_id
         self.title("Статистика")
-        self.geometry("900x600")
+        self.geometry("1000x600")
         self.parent = parent
 
         self.create_widgets()
@@ -48,7 +48,7 @@ class StatisticsForm(tk.Toplevel):
         self.search_entry.bind("<Return>", lambda e: self.load_results())
 
         self.failed_only_var = tk.IntVar()
-        tk.Checkbutton(top, text="Только провалившие (<60%)", variable=self.failed_only_var, command=self.load_results).pack(side=tk.LEFT, padx=10)
+        tk.Checkbutton(top, text="Только провалившие (<50%)", variable=self.failed_only_var, command=self.load_results).pack(side=tk.LEFT, padx=10)
 
         # Таблица
         columns = ("student", "date", "time", "percent", "mark", "status")
@@ -111,12 +111,12 @@ class StatisticsForm(tk.Toplevel):
             mark = calc_mark(percent) if r["score"] is not None else ""
             status = "Пройден" if r["score"] is not None else "Не пройден"
             # Фильтрация по провалившим
-            if self.failed_only_var.get() and percent >= 60:
+            if self.failed_only_var.get() and percent >= 50:
                 continue
             item = (name, date, time_min, f"{percent}%", mark, status)
             iid = self.tree.insert("", tk.END, values=item)
             # Подсветка низких баллов
-            if r["score"] is not None and percent < 60:
+            if r["score"] is not None and percent < 50:
                 self.tree.item(iid, tags=("fail",))
             stats.append((percent, mark, status))
         self.tree.tag_configure("fail", background="#ffcccc")
