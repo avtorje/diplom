@@ -2,10 +2,9 @@ import tkinter as tk
 from database import Database
 
 class GroupMembersForm(tk.Toplevel):
-    """Окно просмотра преподавателей и студентов в группе с прокруткой."""
-    def __init__(self, parent, group_id, group_name):
+    def __init__(self, parent, group_id, group_name, db):
         super().__init__(parent)
-        self.db = Database()
+        self.db = db
         self.group_id = group_id
         self.title(f"Состав группы: {group_name}")
         self.center_window(400, 470)

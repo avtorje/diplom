@@ -237,7 +237,7 @@ class ManageUsersForm(tk.Toplevel):
             return
         group = self.groups[idx[0]]
         from group_users_form import GroupMembersForm
-        GroupMembersForm(self, group['id'], group['name'])
+        GroupMembersForm(self, group['id'], group['name'], self.db)
 
     def add_student(self):
         idx = self.groups_listbox.curselection()
