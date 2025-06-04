@@ -47,7 +47,7 @@ class ManageTestsForm(tk.Toplevel):
         if not test_name:
             return
 
-        groups = self.db.get_groups()
+        groups = self.db.get_available_groups_for_admin(self.current_user_id)
         if not groups:
             messagebox.showerror("Ошибка", "Нет доступных групп.")
             return
@@ -63,6 +63,11 @@ class ManageTestsForm(tk.Toplevel):
         try:
             # --- ВАЖНО: передаём self.current_user_id как author_id ---
             test_id = self.db.add_test(test_name, self.current_user_id, timer_seconds=None)
+            # Проверка: можно ли назначить выбранные группы этому преподавателю?
+            available_ids = set(g['id'] for g in groups)
+            for gid in group_ids:
+                if gid not in available_ids:
+                    raise ValueError("Вы не можете создать тест для группы, в которую не назначены.")
             self.db.add_test_groups(test_id, group_ids)
             self.load_tests()
             messagebox.showinfo("Успешно", f"Тест '{test_name}' успешно добавлен для выбранных групп.")

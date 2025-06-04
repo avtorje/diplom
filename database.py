@@ -292,6 +292,16 @@ class Database:
             "SELECT * FROM GROUPS WHERE id = ?",
             (group_id,)
         )
+    
+    def get_available_groups_for_admin(self, admin_id):
+        """Вернуть все группы, доступные для этого преподавателя (или все, если это главный админ)"""
+        user = self.get_user_by_id(admin_id)
+        if not user:
+            return []
+        if user["role"] == "admin" and user["username"] == "admin":
+            return self.get_groups()
+        else:
+            return self.get_groups_for_admin(admin_id)
 
     def add_group(self, name, access_code):
         self._execute("INSERT INTO GROUPS (name, access_code) VALUES (?, ?)", (name, access_code))
