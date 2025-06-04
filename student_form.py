@@ -16,7 +16,8 @@ class StudentForm(tk.Toplevel):
         self.resizable(False, False)
         self.center_window()
 
-        group_id = self.db.get_user_group_id(self.user_id)
+        user = self.db.get_user_by_id(self.user_id)
+        group_id = user["group_id"] if user else None
         group_info = self.db.get_group_by_id(group_id)
         group_name = group_info["name"] if group_info else "Не определена"
 

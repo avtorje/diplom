@@ -90,10 +90,14 @@ class TestForm(tk.Toplevel):
         self.scrollable_frame.pack(anchor="nw", pady=20)
         self.outer_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig("inner", width=e.width))
-        self.canvas.bind_all("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        # Заменено bind_all -> bind
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
         self.next_button = tk.Button(self, text="Следующий", command=self._on_next)
         self.next_button.pack(pady=10, side="bottom")
         self.bind("<Configure>", lambda e: self.after(100, self._update_wraplength))
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def _update_wraplength(self):
         width = self.canvas.winfo_width() - 120

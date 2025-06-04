@@ -36,7 +36,8 @@ class TestSelectionForm(tk.Toplevel):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
     def load_tests(self):
-        group_id = self.db.get_user_group_id(self.user_id)
+        user = self.db.get_user_by_id(self.user_id)
+        group_id = user["group_id"] if user else None
         # Теперь получаем только не пройденные тесты:
         self.tests = self.db.get_unpassed_tests_for_user(self.user_id, group_id)  # [{'id', 'name', 'timer_seconds'}, ...]
         self.tests_listbox.delete(0, tk.END)

@@ -62,13 +62,18 @@ class LoginForm(tk.Tk):
 
     def student_login(self):
         group_name = self.group_combobox.get()
-        student_name = self.student_combobox.get()
+        student_fullname = self.student_combobox.get()
         group_code = self.group_code_entry.get()
         group = self.db.get_group_by_name(group_name)
         if not group or group['access_code'] != group_code:
             messagebox.showerror("Ошибка", "Неверный код группы!")
             return
-        user = self.db.get_user_by_name_and_group(student_name, group['id'])
+        try:
+            first_name, last_name = student_fullname.strip().split(' ', 1)
+        except ValueError:
+            messagebox.showerror("Ошибка", "Выберите имя и фамилию из списка!")
+            return
+        user = self.db.get_user_by_fullname_and_group(first_name, last_name, group['id'])
         if not user:
             messagebox.showerror("Ошибка", "Студент не найден!")
             return
@@ -90,8 +95,9 @@ class LoginForm(tk.Tk):
         group = self.db.get_group_by_name(group_name)
         if group:
             students = self.db.get_students_by_group(group['id'])
-            # students теперь список словарей, а не кортежей
-            self.student_combobox['values'] = [s['username'] for s in students]
+            self.student_combobox['values'] = [
+                f"{s['first_name']} {s['last_name']}" for s in students
+            ]
             self.student_combobox.set('')
 
     def open_register_form(self):

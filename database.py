@@ -253,10 +253,20 @@ class Database:
 
     # --- Студенты и группы (один-ко-многим) ---
     def get_students_by_group(self, group_id):
-        return self.fetch_all(
+        rows = self.fetch_all(
             "SELECT id, first_name, last_name FROM USERS WHERE group_id = ? AND role = 'student'",
             (group_id,)
         )
+        return [{'id': row["id"], 'first_name': row["first_name"], 'last_name': row["last_name"]} for row in rows]
+    
+    def get_user_by_fullname_and_group(self, first_name, last_name, group_id):
+        row = self.fetch_one(
+            "SELECT * FROM USERS WHERE first_name=? AND last_name=? AND group_id=? AND role='student'",
+            (first_name, last_name, group_id)
+        )
+        if row:
+            return dict(row)
+        return None
     
     def import_students_from_file(self, file_path, group_id):
         with open(file_path, 'r', encoding='utf-8') as f:
