@@ -131,15 +131,6 @@ class Database:
     def check_admin_password(self, admin_id, password):
         row = self.fetch_one("SELECT password FROM USERS WHERE id=? AND role='admin'", (admin_id,))
         return row and row["password"] == self.hash_password(password)
-
-    def get_main_admin(self):
-        row = self.fetch_one("SELECT id, username, first_name, last_name, middle_name FROM USERS WHERE username='admin' AND role='admin'")
-        if row:
-            return {
-                "id": row["id"], "username": row["username"], "first_name": row["first_name"],
-                "last_name": row["last_name"], "middle_name": row["middle_name"]
-            }
-        return None
     
     def update_admin_password(self, admin_id, new_password):
         self._execute(
@@ -175,39 +166,6 @@ class Database:
         self._execute("DELETE FROM USERS WHERE id=?", (user_id,))
         self._execute("DELETE FROM ADMIN_GROUP WHERE admin_id=?", (user_id,))  # очистить связи если это преподаватель
 
-    def get_user(self, **kwargs):
-        if not kwargs:
-            return None
-        query = "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE " + \
-                " AND ".join(f"{k}=?" for k in kwargs)
-        row = self.fetch_one(query, tuple(kwargs.values()))
-        if row:
-            return {
-                "id": row["id"], "username": row["username"], "role": row["role"], "group_id": row["group_id"],
-                "first_name": row["first_name"], "last_name": row["last_name"], "middle_name": row["middle_name"]
-            }
-        return None
-
-    def get_users(self, group_id=None, role=None, exclude_main_admin=False):
-        query = "SELECT id, username, first_name, last_name, middle_name, role FROM USERS WHERE 1=1"
-        params = []
-        if group_id is not None:
-            query += " AND group_id=?"
-            params.append(group_id)
-        if role:
-            query += " AND role=?"
-            params.append(role)
-        if exclude_main_admin:
-            query += " AND NOT (role='admin' AND username='admin')"
-        rows = self._execute(query, tuple(params), fetch=True)
-        return [
-            {
-                "id": r["id"], "username": r["username"], "first_name": r["first_name"],
-                "last_name": r["last_name"], "middle_name": r["middle_name"], "role": r["role"]
-            }
-            for r in rows
-        ]
-
     def get_user_by_id(self, user_id):
         return self.fetch_one(
             "SELECT id, username, role, group_id, first_name, last_name, middle_name FROM USERS WHERE id = ?",
@@ -240,16 +198,6 @@ class Database:
             (admin_id,), fetch=True
         )
         return [{"id": r["id"], "name": r["name"]} for r in rows]
-    
-    def get_full_group_members(self, group_id):
-        # Студенты
-        students = self.fetch_all(
-            "SELECT id, first_name, last_name FROM USERS WHERE group_id = ? AND role = 'student'",
-            (group_id,)
-        )
-        # Преподаватели
-        teachers = self.get_admins_by_group(group_id)
-        return {"students": students, "teachers": teachers}
 
     # --- Студенты и группы (один-ко-многим) ---
     def get_students_by_group(self, group_id):
@@ -267,15 +215,6 @@ class Database:
         if row:
             return dict(row)
         return None
-    
-    def import_students_from_file(self, file_path, group_id):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            lines = [line.strip() for line in f if line.strip()]
-            for line in lines:
-                parts = line.split()
-                if len(parts) >= 2:
-                    last_name, first_name = parts[0], parts[1]
-                    self.add_student(first_name, last_name, group_id)
                     
     def get_groups(self):
         rows = self._execute("SELECT id, name, access_code FROM GROUPS ORDER BY id ASC", fetch=True)
@@ -312,29 +251,6 @@ class Database:
     def delete_group(self, group_id):
         self._execute("DELETE FROM GROUPS WHERE id=?", (group_id,))
 
-    def get_group(self, **kwargs):
-        if not kwargs:
-            return None
-        query = "SELECT id, name, access_code FROM GROUPS WHERE " + " AND ".join(f"{k}=?" for k in kwargs)
-        row = self.fetch_one(query, tuple(kwargs.values()))
-        if row:
-            return {"id": row["id"], "name": row["name"], "access_code": row["access_code"]}
-        return None
-
-    # --- Тесты ---
-    def get_all_tests(self, group_id=None):
-        if group_id is None:
-            rows = self._execute("SELECT id, name, timer_seconds FROM THEME", fetch=True)
-        else:
-            rows = self._execute(
-                "SELECT t.id, t.name, t.timer_seconds FROM THEME t "
-                "JOIN THEME_GROUP tg ON tg.theme_id = t.id WHERE tg.group_id = ?", (group_id,), fetch=True
-            )
-        return [
-            {"id": r["id"], "name": r["name"], "timer_seconds": r["timer_seconds"]}
-            for r in rows
-        ]
-
     def get_test_name(self, theme_id):
         result = self.fetch_one("SELECT name FROM THEME WHERE id=?", (theme_id,))
         return result["name"] if result else "Без названия"
@@ -354,16 +270,6 @@ class Database:
 
     def update_test(self, test_id, test_name, timer_seconds=None):
         self._execute("UPDATE THEME SET name=?, timer_seconds=? WHERE id=?", (test_name, timer_seconds, test_id))
-
-    def remove_test_timer(self, test_id):
-        self._execute("UPDATE THEME SET timer_seconds=NULL WHERE id=?", (test_id,))
-
-    def add_test_groups(self, test_id, group_ids):
-        self._execute(
-            "INSERT INTO THEME_GROUP (theme_id, group_id) VALUES (?, ?)",
-            [(test_id, gid) for gid in group_ids],
-            many=True
-        )
 
     def delete_test(self, test_id):
         question_ids = self._execute("SELECT id FROM QUESTION WHERE theme_id = ?", (test_id,), fetch=True)
@@ -432,14 +338,6 @@ class Database:
 
     def update_theme_local_number(self, question_id, new_number):
         self._execute("UPDATE QUESTION SET theme_local_number = ? WHERE id = ?", (new_number, question_id))
-
-    # --- Результаты тестов ---
-    def save_test_results(self, user_id, test_id, questions, answers, score):
-        date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self._execute(
-            "INSERT INTO TEST_SUMMARY (user_id, theme_id, score, date, answers) VALUES (?, ?, ?, ?, ?)",
-            (user_id, test_id, score, date_str, str(answers))
-        )
 
     def get_unpassed_tests_for_user(self, user_id, group_id):
         query = """

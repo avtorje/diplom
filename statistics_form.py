@@ -50,6 +50,15 @@ class StatisticsForm(tk.Toplevel):
         self.failed_only_var = tk.IntVar()
         tk.Checkbutton(top, text="Только провалившие (<50%)", variable=self.failed_only_var, command=self.load_results).pack(side=tk.LEFT, padx=10)
 
+        # Режим
+        self.mode_var = tk.StringVar(value="single")
+        mode_frame = tk.Frame(self)
+        mode_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        tk.Label(mode_frame, text="Режим:").pack(side=tk.LEFT)
+        tk.Radiobutton(mode_frame, text="По одному тесту", variable=self.mode_var, value="single", command=self.on_mode_change).pack(side=tk.LEFT)
+        tk.Radiobutton(mode_frame, text="По всем тестам", variable=self.mode_var, value="all", command=self.on_mode_change).pack(side=tk.LEFT)
+
         # Таблица
         columns = ("student", "date", "time", "percent", "mark", "status")
         self.tree = ttk.Treeview(self, columns=columns, show="headings")
@@ -106,14 +115,19 @@ class StatisticsForm(tk.Toplevel):
         for r in rows:
             name = f"{r['last_name']} {r['first_name']}"
             date = r["date"][:10] if r["date"] else ""
-            time_min = int(r["elapsed_seconds"]) // 60 if r["elapsed_seconds"] else ""
+            if r["elapsed_seconds"]:
+                minutes = int(r["elapsed_seconds"]) // 60
+                seconds = int(r["elapsed_seconds"]) % 60
+                time_str = f"{minutes}:{seconds:02d}"
+            else:
+                time_str = ""
             percent = r["score"] if r["score"] is not None else 0
             mark = calc_mark(percent) if r["score"] is not None else ""
             status = "Пройден" if r["score"] is not None else "Не пройден"
             # Фильтрация по провалившим
             if self.failed_only_var.get() and percent >= 50:
                 continue
-            item = (name, date, time_min, f"{percent}%", mark, status)
+            item = (name, date, time_str, f"{percent}%", mark, status)
             iid = self.tree.insert("", tk.END, values=item)
             # Подсветка низких баллов
             if r["score"] is not None and percent < 50:
@@ -166,3 +180,68 @@ class StatisticsForm(tk.Toplevel):
         student_name = values[0]
         # Здесь можно реализовать подробности ответа студента (например, открыть отдельное окно)
         messagebox.showinfo("Подробности", f"Подробности по студенту: {student_name}")
+
+    def on_mode_change(self):
+        mode = self.mode_var.get()
+        if mode == "single":
+            self.test_cb.config(state="readonly")
+            self.tree["columns"] = ("student", "date", "time", "percent", "mark", "status")
+            for col, txt in zip(self.tree["columns"], ["Студент", "Дата", "Время (мин)", "Процент", "Оценка", "Статус"]):
+                self.tree.heading(col, text=txt)
+                self.tree.column(col, anchor="center", width=120)
+            self.load_results()
+        else:
+            self.test_cb.config(state="disabled")
+            self.build_summary_table()
+
+    def build_summary_table(self):
+        self.tree.delete(*self.tree.get_children())
+        group_idx = self.group_cb.current()
+        if group_idx < 0:
+            return
+        group_id = self.groups[group_idx]["id"]
+        students = self.db.get_students_by_group(group_id)
+        tests = self.db.get_teacher_tests_for_group(self.admin_id, group_id)
+        test_ids = [t["id"] for t in tests]
+        test_names = [t["name"] for t in tests]
+        # Получаем все результаты по группе и тестам
+        results = self.db.fetch_all(
+            "SELECT user_id, theme_id, score FROM TEST_SUMMARY WHERE theme_id IN ({})".format(
+                ",".join("?" * len(test_ids))
+            ), tuple(test_ids)
+        ) if test_ids else []
+        res_map = {(r["user_id"], r["theme_id"]): r["score"] for r in results}
+        # Формируем столбцы
+        columns = ["student"] + test_names + ["avg_percent", "avg_mark"]
+        self.tree["columns"] = columns
+        for col in columns:
+            if col == "student":
+                self.tree.heading(col, text="Студент")
+                self.tree.column(col, anchor="center", width=140)
+            elif col == "avg_percent":
+                self.tree.heading(col, text="Средний %")
+                self.tree.column(col, anchor="center", width=100)
+            elif col == "avg_mark":
+                self.tree.heading(col, text="Ср. оценка")
+                self.tree.column(col, anchor="center", width=100)
+            else:
+                self.tree.heading(col, text=col)
+                self.tree.column(col, anchor="center", width=100)
+        # Заполняем строки
+        for s in students:
+            row = [f"{s['last_name']} {s['first_name'][0]}"]
+            scores = []
+            marks = []
+            for t in tests:
+                score = res_map.get((s["id"], t["id"]))
+                if score is not None:
+                    row.append(f"{score}%")
+                    scores.append(score)
+                    marks.append(calc_mark(score))
+                else:
+                    row.append("—")
+            avg_percent = round(sum(scores)/len(scores), 1) if scores else "—"
+            avg_mark = round(sum(marks)/len(marks), 1) if marks else "—"
+            row += [avg_percent, avg_mark]
+            self.tree.insert("", tk.END, values=row)
+        self.summary_label.config(text=f"Сводная таблица: {len(students)} студентов, {len(tests)} тестов")
