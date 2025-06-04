@@ -46,6 +46,8 @@ class AdminForm(tk.Tk):
         self.withdraw()
         if form_class == ManageTestsForm:
             form_class(self, self.admin_id).mainloop()
+        elif form_class.__name__ == "StatisticsForm":
+            form_class(self, self.admin_id)
         else:
             form_class(self).mainloop()
 

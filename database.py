@@ -513,3 +513,32 @@ class Database:
         count = self.fetch_one("SELECT COUNT(*) as cnt FROM THEME_GROUP WHERE theme_id=?", (test_id,))["cnt"]
         if count == 0:
             self.delete_test(test_id)
+
+    def get_teacher_groups(self, admin_id):
+        """Группы, к которым назначен преподаватель"""
+        return self.get_groups_for_admin(admin_id)
+
+    def get_teacher_tests_for_group(self, admin_id, group_id):
+        """Тесты, созданные преподавателем и назначенные выбранной группе"""
+        rows = self._execute(
+            "SELECT t.id, t.name, t.timer_seconds FROM THEME t "
+            "JOIN THEME_GROUP tg ON tg.theme_id = t.id "
+            "WHERE tg.group_id = ? AND t.author_id = ?",
+            (group_id, admin_id), fetch=True
+        )
+        return [{"id": r["id"], "name": r["name"], "timer_seconds": r["timer_seconds"]} for r in rows]
+
+    def get_test_results_for_group(self, group_id, test_id, search_student=None):
+        """Результаты студентов по тесту и группе"""
+        query = """
+            SELECT u.id as user_id, u.last_name, u.first_name, ts.date, ts.score, ts.elapsed_seconds
+            FROM USERS u
+            LEFT JOIN TEST_SUMMARY ts ON ts.user_id = u.id AND ts.theme_id = ?
+            WHERE u.group_id = ? AND u.role = 'student'
+        """
+        params = [test_id, group_id]
+        if search_student:
+            query += " AND (u.last_name LIKE ? OR u.first_name LIKE ?)"
+            params += [f"%{search_student}%", f"%{search_student}%"]
+        query += " ORDER BY u.last_name, u.first_name"
+        return self._execute(query, tuple(params), fetch=True)
