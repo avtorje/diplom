@@ -80,15 +80,20 @@ class LoginForm(tk.Tk):
         self._open_form(user, student=True)
 
     def _open_form(self, user, student=False):
-        # user был кортежем, теперь это словарь!
         if not student and user["role"] == "admin":
             messagebox.showinfo("Успешно", "Добро пожаловать, администратор!")
             self.destroy()
+            from admin_form import AdminForm
             AdminForm(user["id"]).mainloop()
         else:
-            messagebox.showinfo("Вход выполнен", f"Добро пожаловать, {user['username']}!")
-            self.withdraw()
-            StudentForm(user['id'], user['username']).mainloop()
+            messagebox.showinfo("Вход выполнен", f"Добро пожаловать, {user['first_name']} {user['last_name']}!")
+            self.destroy()
+            import tkinter as tk
+            from student_form import StudentForm
+            root = tk.Tk()
+            root.withdraw()  # Скрываем главное окно
+            StudentForm(user["id"])
+            root.mainloop()
 
     def on_group_selected(self, event):
         group_name = self.group_combobox.get()

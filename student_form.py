@@ -6,24 +6,32 @@ from result_form import ResultForm
 from journal_window import JournalWindow
 
 class StudentForm(tk.Toplevel):
-    def __init__(self, user_id, username):
+    def __init__(self, user_id):
         super().__init__()
         self.db = Database()
         self.user_id = user_id
-        self.username = username
-        self.title(f"Панель студента - {username}")
+        user = self.db.get_user_by_id(self.user_id)
+        if user:
+            # Исправлено: используем индексацию как у словаря
+            self.first_name = user['first_name']
+            self.last_name = user['last_name']
+            username = user['username']
+        else:
+            self.first_name = self.last_name = ""
+            username = ""
+        self.title(f"Панель студента - {self.last_name} {self.first_name}")
         self.geometry("400x300")
         self.resizable(False, False)
         self.center_window()
 
-        user = self.db.get_user_by_id(self.user_id)
         group_id = user["group_id"] if user else None
         group_info = self.db.get_group_by_id(group_id)
         group_name = group_info["name"] if group_info else "Не определена"
 
         info_frame = tk.Frame(self)
         info_frame.pack(pady=10)
-        tk.Label(info_frame, text=f"Студент: {self.username}", font=("Arial", 14, "bold")).pack()
+        # Изменено: выводим ФИО
+        tk.Label(info_frame, text=f"Студент: {self.last_name} {self.first_name}", font=("Arial", 14, "bold")).pack()
         tk.Label(info_frame, text=f"Группа: {group_name}", font=("Arial", 12)).pack()
 
         btn_frame = tk.Frame(self)
