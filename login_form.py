@@ -23,7 +23,6 @@ class LoginForm(tk.Tk):
         self._create_labeled_entry(self.admin_tab, "Имя пользователя", "username_entry")
         self._create_labeled_entry(self.admin_tab, "Пароль", "password_entry", show="*")
         tk.Button(self.admin_tab, text="Войти", command=self.login).pack(pady=5)
-        tk.Button(self.admin_tab, text="Регистрация", command=self.open_register_form).pack(pady=5)
 
         # --- Студенческая форма ---
         self._create_labeled_combobox(self.student_tab, "Выберите группу", "group_combobox", self.on_group_selected)
@@ -104,11 +103,6 @@ class LoginForm(tk.Tk):
                 f"{s['first_name']} {s['last_name']}" for s in students
             ]
             self.student_combobox.set('')
-
-    def open_register_form(self):
-        self.destroy()
-        from register_form import RegisterForm
-        RegisterForm().mainloop()
 
     def center_window(self):
         self.update_idletasks()

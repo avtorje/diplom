@@ -271,7 +271,18 @@ class Database:
     def update_test(self, test_id, test_name, timer_seconds=None):
         self._execute("UPDATE THEME SET name=?, timer_seconds=? WHERE id=?", (test_name, timer_seconds, test_id))
 
-    def delete_test(self, test_id):
+    def delete_test(self, test_id, user_id=None):
+        """Удаляет тест только если user_id — автор или главный админ"""
+        test = self.fetch_one("SELECT author_id FROM THEME WHERE id=?", (test_id,))
+        if not test:
+            raise ValueError("Тест не найден.")
+        if user_id is not None:
+            user = self.get_user_by_id(user_id)
+            if not user:
+                raise ValueError("Пользователь не найден.")
+            # Только автор теста или главный админ (username == 'admin')
+            if user["id"] != test["author_id"] and not (user["role"] == "admin" and user["username"] == "admin"):
+                raise PermissionError("Вы не можете удалить этот тест.")
         question_ids = self._execute("SELECT id FROM QUESTION WHERE theme_id = ?", (test_id,), fetch=True)
         if question_ids:
             self._execute("DELETE FROM ANSWER WHERE question_id = ?", [(qid["id"],) for qid in question_ids], many=True)
@@ -405,12 +416,11 @@ class Database:
             self._execute("INSERT INTO THEME_GROUP (theme_id, group_id) VALUES (?, ?)", (test_id, gid))
 
     # Новый: Удалить тест только из одной группы (или полностью, если больше не назначен)
-    def remove_test_from_group(self, test_id, group_id):
+    def remove_test_from_group(self, test_id, group_id, user_id=None):
         self._execute("DELETE FROM THEME_GROUP WHERE theme_id=? AND group_id=?", (test_id, group_id))
-        # Если тест не назначен ни в одну группу — удалить сам тест и все вопросы/ответы
         count = self.fetch_one("SELECT COUNT(*) as cnt FROM THEME_GROUP WHERE theme_id=?", (test_id,))["cnt"]
         if count == 0:
-            self.delete_test(test_id)
+            self.delete_test(test_id, user_id)
 
     def get_teacher_groups(self, admin_id):
         """Группы, к которым назначен преподаватель"""

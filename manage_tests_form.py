@@ -112,8 +112,13 @@ class ManageTestsForm(tk.Toplevel):
             return
         group_id = self.groups[self.selected_group_idx]["id"]
         if messagebox.askyesno("Удалить тест", "Удалить этот тест только из выбранной группы? (Если тест не назначен ни в одну группу, он будет удалён полностью)"):
-            self.db.remove_test_from_group(test["id"], group_id)
-            self.load_tests_for_selected_group()
+            try:
+                self.db.remove_test_from_group(test["id"], group_id, self.current_user_id)
+                self.load_tests_for_selected_group()
+            except PermissionError as e:
+                messagebox.showerror("Ошибка", str(e))
+            except Exception as e:
+                messagebox.showerror("Ошибка", f"Не удалось удалить тест: {e}")
 
     def go_back(self):
         self.destroy()

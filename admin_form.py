@@ -52,7 +52,7 @@ class AdminForm(tk.Tk):
             form_class(self).mainloop()
 
     def go_back(self, _=None):
-        if messagebox.askyesno("Вернуться", "Вы уверены, что хотите вернуться в меню регистрации?"):
+        if messagebox.askyesno("Вернуться", "Вы уверены, что хотите вернуться в меню входа?"):
             self.destroy()
             from login_form import LoginForm
             LoginForm().mainloop()

@@ -79,8 +79,20 @@ class ManageUsersForm(tk.Toplevel):
         self.title("Управление пользователями")
         self.geometry("900x650")
         self.parent = parent
+        self.center_window()  # Добавьте эту строку
         self.create_widgets()
         self.refresh_all()
+
+    def center_window(self):
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        if width == 1 and height == 1:
+            width = 900
+            height = 650
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def create_widgets(self):
         # Преподаватели

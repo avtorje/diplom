@@ -25,8 +25,21 @@ class StatisticsForm(tk.Toplevel):
         self.geometry("1000x600")
         self.parent = parent
 
+        self.center_window()  # Центрирование окна
+
         self.create_widgets()
         self.load_groups()
+
+    def center_window(self):
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        if width == 1 and height == 1:
+            width = 1000
+            height = 600
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def create_widgets(self):
         top = tk.Frame(self)
