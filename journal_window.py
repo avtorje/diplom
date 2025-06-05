@@ -2,7 +2,10 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
 
+# === Вспомогательные функции для обработки данных ===
+
 def calc_mark(score: int) -> int:
+    # Перевод процента результата в оценку по пятибалльной шкале
     if score >= 90:
         return 5
     elif score >= 70:
@@ -15,13 +18,17 @@ def calc_mark(score: int) -> int:
         return 1
 
 def format_timer(seconds):
+    # Форматирование времени ограничения теста для отображения
     if seconds is None:
         return "Без ограничения"
     else:
         m = int(seconds) // 60
         return f"{m} минут" if m else f"{seconds} секунд"
 
+# === Класс окна журнала тестов ===
+
 class JournalWindow(tk.Toplevel):
+    # --- Инициализация и построение интерфейса ---
     def __init__(self, master, db, user_id):
         super().__init__(master)
         self.title("Журнал прохождения тестов")
@@ -37,37 +44,33 @@ class JournalWindow(tk.Toplevel):
         self.tree.heading("timer", text="Ограничение по времени")
         self.tree.heading("answers", text="Время прохождения (сек)")
 
-        # Устанавливаем ширину столбцов: score и mark уменьшены в 3 раза
-        self.tree.column("score", anchor="center", width=100) # Было 150, стало 50
-        self.tree.column("mark", anchor="center", width=100)  # Было 120, стало 40
+        self.tree.column("score", anchor="center", width=100)
+        self.tree.column("mark", anchor="center", width=100)
 
-        # Остальные столбцы можно оставить по умолчанию или скорректировать под себя
         for col in columns:
             if col not in ("score", "mark"):
                 self.tree.column(col, anchor="center")
 
-        # Вертикальный скроллбар
         vsb = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
 
-        # Горизонтальный скроллбар
         hsb = ttk.Scrollbar(self, orient="horizontal", command=self.tree.xview)
         self.tree.configure(xscrollcommand=hsb.set)
 
         self.tree.grid(row=0, column=0, sticky="nsew")
         vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")  # горизонтальный скроллбар под деревом
+        hsb.grid(row=1, column=0, sticky="ew")
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # Итоговая строка под скроллами
         self.avg_label = ttk.Label(self, text="")
         self.avg_label.grid(row=2, column=0, columnspan=2, sticky="ew")
 
         self.populate(db, user_id)
         self.center_window()
 
+    # --- Центрирование окна на экране ---
     def center_window(self):
         self.update_idletasks()
         width = self.winfo_width()
@@ -79,6 +82,7 @@ class JournalWindow(tk.Toplevel):
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
 
+    # --- Заполнение таблицы результатами пользователя ---
     def populate(self, db, user_id):
         results = db.get_journal_for_user(user_id)
         total = 0

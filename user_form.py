@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 from database import Database
 
 class UserForm(tk.Toplevel):
+    # === Инициализация и конфигурация окна ===
     def __init__(self, parent, title, user_id=None, group_id=None, role="student"):
         super().__init__(parent)
         self.db = Database()
@@ -18,6 +19,7 @@ class UserForm(tk.Toplevel):
             self.load_user()
 
     def center_window(self, width=400, height=220):
+        # Центрирует окно на экране
         self.update_idletasks()
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -25,7 +27,9 @@ class UserForm(tk.Toplevel):
         y = (screen_height // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
 
+    # === Создание и настройка виджетов ===
     def create_widgets(self):
+        # Создаёт и размещает элементы формы
         pad = {"padx": 10, "pady": 5}
         frm = tk.Frame(self)
         frm.pack(fill=tk.BOTH, expand=True, **pad)
@@ -49,10 +53,14 @@ class UserForm(tk.Toplevel):
         btn = tk.Button(frm, text="Сохранить", command=self.save_user)
         btn.grid(row=3, column=0, columnspan=2, pady=(15, 5))
 
+    # === Вспомогательные методы ===
     def get_group_name(self, group_id):
+        # Возвращает название группы по её id
         return next((g['name'] for g in self.groups if g['id'] == group_id), "")
 
+    # === Работа с пользователем ===
     def save_user(self):
+        # Сохраняет или обновляет данные пользователя
         first_name = self.first_name_entry.get().strip()
         last_name = self.last_name_entry.get().strip()
         group_id = self.forced_group_id or next((g['id'] for g in self.groups if g['name'] == self.group_combobox.get()), None)
@@ -68,6 +76,7 @@ class UserForm(tk.Toplevel):
         self.destroy()
 
     def load_user(self):
+        # Загружает данные пользователя в форму
         user = self.db.get_user_by_id(self.user_id)
         if user:
             self.first_name_entry.delete(0, tk.END)

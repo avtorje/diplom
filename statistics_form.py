@@ -2,7 +2,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from database import Database
 
+# === Вспомогательные функции ===
 def calc_mark(score):
+    # Перевод процента в оценку по шкале
     if score is None:
         return ""
     if score >= 90:
@@ -16,7 +18,9 @@ def calc_mark(score):
     else:
         return 1
 
+# === Класс формы статистики ===
 class StatisticsForm(tk.Toplevel):
+    # --- Инициализация и построение интерфейса ---
     def __init__(self, parent, admin_id):
         super().__init__(parent)
         self.db = Database()
@@ -25,12 +29,12 @@ class StatisticsForm(tk.Toplevel):
         self.geometry("1000x600")
         self.parent = parent
 
-        self.center_window()  # Центрирование окна
-
+        self.center_window()
         self.create_widgets()
         self.load_groups()
 
     def center_window(self):
+        # Центрирует окно на экране
         self.update_idletasks()
         width = self.winfo_width()
         height = self.winfo_height()
@@ -42,6 +46,7 @@ class StatisticsForm(tk.Toplevel):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
     def create_widgets(self):
+        # Создаёт все элементы управления интерфейса
         top = tk.Frame(self)
         top.pack(fill=tk.X, padx=10, pady=5)
 
@@ -61,38 +66,52 @@ class StatisticsForm(tk.Toplevel):
         self.search_entry.bind("<Return>", lambda e: self.load_results())
 
         self.failed_only_var = tk.IntVar()
-        tk.Checkbutton(top, text="Только провалившие (<50%)", variable=self.failed_only_var, command=self.load_results).pack(side=tk.LEFT, padx=10)
+        tk.Checkbutton(
+            top,
+            text="Только провалившие (<50%)",
+            variable=self.failed_only_var,
+            command=self.load_results
+        ).pack(side=tk.LEFT, padx=10)
 
-        # Режим
         self.mode_var = tk.StringVar(value="single")
         mode_frame = tk.Frame(self)
         mode_frame.pack(fill=tk.X, padx=10, pady=5)
 
         tk.Label(mode_frame, text="Режим:").pack(side=tk.LEFT)
-        tk.Radiobutton(mode_frame, text="По одному тесту", variable=self.mode_var, value="single", command=self.on_mode_change).pack(side=tk.LEFT)
-        tk.Radiobutton(mode_frame, text="По всем тестам", variable=self.mode_var, value="all", command=self.on_mode_change).pack(side=tk.LEFT)
+        tk.Radiobutton(
+            mode_frame, text="По одному тесту",
+            variable=self.mode_var, value="single",
+            command=self.on_mode_change
+        ).pack(side=tk.LEFT)
+        tk.Radiobutton(
+            mode_frame, text="По всем тестам",
+            variable=self.mode_var, value="all",
+            command=self.on_mode_change
+        ).pack(side=tk.LEFT)
 
-        # Таблица
         columns = ("student", "date", "time", "percent", "mark", "status")
         self.tree = ttk.Treeview(self, columns=columns, show="headings")
-        for col, txt in zip(columns, ["Студент", "Дата", "Время (мин)", "Процент", "Оценка", "Статус"]):
+        for col, txt in zip(
+            columns,
+            ["Студент", "Дата", "Время (мин)", "Процент", "Оценка", "Статус"]
+        ):
             self.tree.heading(col, text=txt)
             self.tree.column(col, anchor="center", width=120)
         self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         self.tree.bind("<Double-1>", self.on_row_double_click)
 
-        # Сводная информация
         self.summary_label = tk.Label(self, text="", font=("Arial", 12, "bold"))
         self.summary_label.pack(pady=5)
 
-        # Кнопки
         btns = tk.Frame(self)
         btns.pack(fill=tk.X, pady=8)
         tk.Button(btns, text="Обновить", command=self.load_results).pack(side=tk.LEFT, padx=10)
         tk.Button(btns, text="Экспорт в Excel", command=self.export_excel).pack(side=tk.LEFT, padx=10)
         tk.Button(btns, text="Назад", command=self.go_back).pack(side=tk.RIGHT, padx=10)
 
+    # --- Загрузка и обработка данных ---
     def load_groups(self):
+        # Загружает список групп преподавателя
         self.groups = self.db.get_teacher_groups(self.admin_id)
         self.group_cb["values"] = [g["name"] for g in self.groups]
         if self.groups:
@@ -100,6 +119,7 @@ class StatisticsForm(tk.Toplevel):
             self.on_group_selected()
 
     def on_group_selected(self, event=None):
+        # Обработка выбора группы, загрузка тестов
         idx = self.group_cb.current()
         if idx < 0:
             self.test_cb["values"] = []
@@ -112,9 +132,11 @@ class StatisticsForm(tk.Toplevel):
         self.load_results()
 
     def on_test_selected(self, event=None):
+        # Обработка выбора теста
         self.load_results()
 
     def load_results(self):
+        # Загружает и отображает результаты тестирования по выбранным фильтрам
         self.tree.delete(*self.tree.get_children())
         group_idx = self.group_cb.current()
         test_idx = self.test_cb.current()
@@ -137,77 +159,18 @@ class StatisticsForm(tk.Toplevel):
             percent = r["score"] if r["score"] is not None else 0
             mark = calc_mark(percent) if r["score"] is not None else ""
             status = "Пройден" if r["score"] is not None else "Не пройден"
-            # Фильтрация по провалившим
             if self.failed_only_var.get() and percent >= 50:
                 continue
             item = (name, date, time_str, f"{percent}%", mark, status)
             iid = self.tree.insert("", tk.END, values=item)
-            # Подсветка низких баллов
             if r["score"] is not None and percent < 50:
                 self.tree.item(iid, tags=("fail",))
             stats.append((percent, mark, status))
         self.tree.tag_configure("fail", background="#ffcccc")
         self.update_summary(stats, len(rows))
 
-    def update_summary(self, stats, total):
-        if not stats:
-            self.summary_label.config(text="Нет данных")
-            return
-        marks = [m for _, m, s in stats if m != ""]
-        percents = [p for p, _, s in stats if p is not None]
-        passed = sum(1 for _, _, s in stats if s == "Пройден")
-        failed = total - passed
-        avg = round(sum(marks) / len(marks), 2) if marks else 0
-        min_p = min(percents) if percents else 0
-        max_p = max(percents) if percents else 0
-        self.summary_label.config(
-            text=f"Средний балл: {avg} | Прошли: {passed} из {total} | Мин. результат: {min_p}% | Макс.: {max_p}%"
-        )
-
-    def export_excel(self):
-        try:
-            import pandas as pd
-        except ImportError:
-            messagebox.showerror("Ошибка", "Для экспорта нужен пакет pandas.")
-            return
-        rows = [self.tree.item(i)["values"] for i in self.tree.get_children()]
-        if not rows:
-            messagebox.showinfo("Нет данных", "Нет данных для экспорта.")
-            return
-        file = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")])
-        if not file:
-            return
-        df = pd.DataFrame(rows, columns=["Студент", "Дата", "Время (мин)", "Процент", "Оценка", "Статус"])
-        df.to_excel(file, index=False)
-        messagebox.showinfo("Успех", "Данные экспортированы в Excel.")
-
-    def go_back(self):
-        self.destroy()
-        self.parent.deiconify()
-
-    def on_row_double_click(self, event):
-        item = self.tree.selection()
-        if not item:
-            return
-        values = self.tree.item(item[0])["values"]
-        student_name = values[0]
-        # Здесь можно реализовать подробности ответа студента (например, открыть отдельное окно)
-        messagebox.showinfo("Подробности", f"Подробности по студенту: {student_name}")
-
-    def on_mode_change(self):
-        mode = self.mode_var.get()
-        if mode == "single":
-            self.test_cb.config(state="readonly")
-            self.tree["columns"] = ("student", "date", "time", "percent", "mark", "status")
-            for col, txt in zip(self.tree["columns"], ["Студент", "Дата", "Время (мин)", "Процент", "Оценка", "Статус"]):
-                self.tree.heading(col, text=txt)
-                self.tree.column(col, anchor="center", width=120)
-            self.load_results()
-        else:
-            self.test_cb.config(state="disabled")
-            self.build_summary_table()
-
     def build_summary_table(self):
+        # Формирует сводную таблицу по всем тестам для группы
         self.tree.delete(*self.tree.get_children())
         group_idx = self.group_cb.current()
         if group_idx < 0:
@@ -217,14 +180,12 @@ class StatisticsForm(tk.Toplevel):
         tests = self.db.get_teacher_tests_for_group(self.admin_id, group_id)
         test_ids = [t["id"] for t in tests]
         test_names = [t["name"] for t in tests]
-        # Получаем все результаты по группе и тестам
         results = self.db.fetch_all(
             "SELECT user_id, theme_id, score FROM TEST_SUMMARY WHERE theme_id IN ({})".format(
                 ",".join("?" * len(test_ids))
             ), tuple(test_ids)
         ) if test_ids else []
         res_map = {(r["user_id"], r["theme_id"]): r["score"] for r in results}
-        # Формируем столбцы
         columns = ["student"] + test_names + ["avg_percent", "avg_mark"]
         self.tree["columns"] = columns
         for col in columns:
@@ -240,7 +201,6 @@ class StatisticsForm(tk.Toplevel):
             else:
                 self.tree.heading(col, text=col)
                 self.tree.column(col, anchor="center", width=100)
-        # Заполняем строки
         for s in students:
             row = [f"{s['last_name']} {s['first_name'][0]}"]
             scores = []
@@ -258,3 +218,70 @@ class StatisticsForm(tk.Toplevel):
             row += [avg_percent, avg_mark]
             self.tree.insert("", tk.END, values=row)
         self.summary_label.config(text=f"Сводная таблица: {len(students)} студентов, {len(tests)} тестов")
+
+    # --- Обновление и экспорт данных ---
+    def update_summary(self, stats, total):
+        # Обновляет сводную строку статистики под таблицей
+        if not stats:
+            self.summary_label.config(text="Нет данных")
+            return
+        marks = [m for _, m, s in stats if m != ""]
+        percents = [p for p, _, s in stats if p is not None]
+        passed = sum(1 for _, _, s in stats if s == "Пройден")
+        failed = total - passed
+        avg = round(sum(marks) / len(marks), 2) if marks else 0
+        min_p = min(percents) if percents else 0
+        max_p = max(percents) if percents else 0
+        self.summary_label.config(
+            text=f"Средний балл: {avg} | Прошли: {passed} из {total} | Мин. результат: {min_p}% | Макс.: {max_p}%"
+        )
+
+    def export_excel(self):
+        # Экспортирует данные таблицы в Excel-файл
+        try:
+            import pandas as pd
+        except ImportError:
+            messagebox.showerror("Ошибка", "Для экспорта нужен пакет pandas.")
+            return
+        rows = [self.tree.item(i)["values"] for i in self.tree.get_children()]
+        if not rows:
+            messagebox.showinfo("Нет данных", "Нет данных для экспорта.")
+            return
+        file = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")])
+        if not file:
+            return
+        df = pd.DataFrame(rows, columns=["Студент", "Дата", "Время (мин)", "Процент", "Оценка", "Статус"])
+        df.to_excel(file, index=False)
+        messagebox.showinfo("Успех", "Данные экспортированы в Excel.")
+
+    # --- Обработка событий интерфейса ---
+    def go_back(self):
+        # Возвращает к родительскому окну
+        self.destroy()
+        self.parent.deiconify()
+
+    def on_row_double_click(self, event):
+        # Показывает подробности по студенту при двойном клике
+        item = self.tree.selection()
+        if not item:
+            return
+        values = self.tree.item(item[0])["values"]
+        student_name = values[0]
+        messagebox.showinfo("Подробности", f"Подробности по студенту: {student_name}")
+
+    def on_mode_change(self):
+        # Переключает режим отображения (по одному тесту или по всем)
+        mode = self.mode_var.get()
+        if mode == "single":
+            self.test_cb.config(state="readonly")
+            self.tree["columns"] = ("student", "date", "time", "percent", "mark", "status")
+            for col, txt in zip(
+                self.tree["columns"],
+                ["Студент", "Дата", "Время (мин)", "Процент", "Оценка", "Статус"]
+            ):
+                self.tree.heading(col, text=txt)
+                self.tree.column(col, anchor="center", width=120)
+            self.load_results()
+        else:
+            self.test_cb.config(state="disabled")
+            self.build_summary_table()

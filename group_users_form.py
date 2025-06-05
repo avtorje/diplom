@@ -2,6 +2,7 @@ import tkinter as tk
 from database import Database
 
 class GroupMembersForm(tk.Toplevel):
+    # ----------- Инициализация и конфигурация окна -----------
     def __init__(self, parent, group_id, group_name, db):
         super().__init__(parent)
         self.db = db
@@ -10,7 +11,9 @@ class GroupMembersForm(tk.Toplevel):
         self.center_window(400, 470)
         self.create_widgets()
 
+    # ----------- Вспомогательные методы интерфейса -----------
     def center_window(self, width=400, height=470):
+        # Центрирует окно на экране
         self.update_idletasks()
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -18,10 +21,11 @@ class GroupMembersForm(tk.Toplevel):
         y = (screen_height // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
 
+    # ----------- Создание и заполнение виджетов -----------
     def create_widgets(self):
         pad = {"padx": 10, "pady": 5}
 
-        # Преподаватели
+        # Блок преподавателей
         tk.Label(self, text="Преподаватели группы:", font=("Arial", 12, "bold")).pack(anchor="w", **pad)
         adm_frame = tk.Frame(self)
         adm_frame.pack(fill=tk.X, padx=10)
@@ -33,11 +37,13 @@ class GroupMembersForm(tk.Toplevel):
         admins = self.db.get_admins_by_group(self.group_id)
         if admins:
             for a in admins:
+                # Добавление преподавателей в список
                 self.admins_listbox.insert(tk.END, f"{a['last_name']} {a['first_name']} ({a['username']})")
         else:
+            # Если преподавателей нет
             self.admins_listbox.insert(tk.END, "Нет преподавателей")
 
-        # Студенты
+        # Блок студентов
         tk.Label(self, text="Студенты группы:", font=("Arial", 12, "bold")).pack(anchor="w", **pad)
         stud_frame = tk.Frame(self)
         stud_frame.pack(fill=tk.BOTH, expand=True, padx=10)
@@ -49,8 +55,11 @@ class GroupMembersForm(tk.Toplevel):
         students = self.db.get_students_by_group(self.group_id)
         if students:
             for s in students:
+                # Добавление студентов в список
                 self.students_listbox.insert(tk.END, f"{s['last_name']} {s['first_name']}")
         else:
+            # Если студентов нет
             self.students_listbox.insert(tk.END, "Нет студентов")
 
+        # Кнопка закрытия окна
         tk.Button(self, text="Закрыть", command=self.destroy).pack(pady=15)

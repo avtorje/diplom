@@ -5,6 +5,7 @@ from database import Database
 from test_result_window import TestResultWindow
 
 class TestForm(tk.Toplevel):
+    # === Инициализация и построение интерфейса ===
     def __init__(self, parent, user_id, test_id, student_form):
         super().__init__(parent)
         self.db = Database()
@@ -14,13 +15,12 @@ class TestForm(tk.Toplevel):
         self.answers = []
         self.current_question_index = 0
         self.selected_option = tk.IntVar(value=-1)
-        self.selected_options_vars = None  # Для множественного выбора
+        self.selected_options_vars = None
         self.all_dynamic_labels = []
         self.parent = parent
         self.start_time = time.time()
         self.student_form = student_form
 
-        # Таймер и тема (обращения к словарю)
         self.theme = self.db.get_theme(test_id)
         self.timer_seconds = self.theme["timer_seconds"] if self.theme and self.theme["timer_seconds"] else None
         self.time_left = self.timer_seconds
@@ -42,41 +42,8 @@ class TestForm(tk.Toplevel):
             self.timer_label.place(x=10, y=10)
             self.update_timer()
 
-    def format_time(self, seconds):
-        minutes = seconds // 60
-        secs = seconds % 60
-        return f"Осталось: {minutes:02}:{secs:02}"
-
-    def update_timer(self):
-        if self.time_left > 0:
-            self.timer_label.config(text=self.format_time(self.time_left))
-            self.time_left -= 1
-            self.after(1000, self.update_timer)
-        else:
-            self.timer_label.config(text="Время вышло!")
-            self.finish_test_due_to_timeout()
-
-    def finish_test_due_to_timeout(self):
-        # Остальные неотвеченные вопросы считаются без ответа
-        while len(self.answers) < len(self.questions):
-            q = self.questions[len(self.answers)]
-            if len(q["correct_options"]) > 1:
-                self.answers.append([])  # пустой выбор для множественного
-            else:
-                self.answers.append(-1)
-        score = self.calculate_score()
-        percent = (score / len(self.questions)) * 100 if self.questions else 0
-        total_time = self.timer_seconds
-        self.show_result_window(total_time, percent)
-
-    def center_window(self):
-        self.update_idletasks()
-        w, h = 500, 400
-        x = (self.winfo_screenwidth() // 2) - (w // 2)
-        y = (self.winfo_screenheight() // 2) - (h // 2)
-        self.geometry(f"{w}x{h}+{x}+{y}")
-
     def _build_ui(self):
+        # Создание контейнеров, скролла и кнопки "Следующий"
         self.container = tk.Frame(self)
         self.container.pack(fill="both", expand=True)
         self.canvas = tk.Canvas(self.container, background="#f0f0f0", highlightthickness=0)
@@ -90,21 +57,22 @@ class TestForm(tk.Toplevel):
         self.scrollable_frame.pack(anchor="nw", pady=20)
         self.outer_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig("inner", width=e.width))
-        # Заменено bind_all -> bind
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
         self.next_button = tk.Button(self, text="Следующий", command=self._on_next)
         self.next_button.pack(pady=10, side="bottom")
         self.bind("<Configure>", lambda e: self.after(100, self._update_wraplength))
 
-    def _on_mousewheel(self, event):
-        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    def center_window(self):
+        # Центрирование окна на экране
+        self.update_idletasks()
+        w, h = 500, 400
+        x = (self.winfo_screenwidth() // 2) - (w // 2)
+        y = (self.winfo_screenheight() // 2) - (h // 2)
+        self.geometry(f"{w}x{h}+{x}+{y}")
 
-    def _update_wraplength(self):
-        width = self.canvas.winfo_width() - 120
-        for lbl in self.all_dynamic_labels:
-            lbl.config(wraplength=width if width > 0 else 360)
-
+    # === Работа с вопросами и вариантами ответов ===
     def load_question(self):
+        # Загрузка и отображение текущего вопроса и вариантов ответов
         for w in self.scrollable_frame.winfo_children():
             w.destroy()
         self.all_dynamic_labels.clear()
@@ -149,7 +117,9 @@ class TestForm(tk.Toplevel):
         self.after(100, self._update_wraplength)
         self.canvas.yview_moveto(0)
 
+    # === Обработка событий пользователя ===
     def _on_next(self):
+        # Обработка перехода к следующему вопросу
         q = self.questions[self.current_question_index]
         is_multiple = len(q["correct_options"]) > 1
         if is_multiple:
@@ -168,6 +138,7 @@ class TestForm(tk.Toplevel):
         self.load_question()
 
     def _on_finish(self):
+        # Завершение теста и подсчет результата
         q = self.questions[self.current_question_index]
         is_multiple = len(q["correct_options"]) > 1
         if is_multiple:
@@ -184,18 +155,48 @@ class TestForm(tk.Toplevel):
             self.answers.append(sel)
         score = self.calculate_score()
         percent = (score / len(self.questions)) * 100 if self.questions else 0
-        # Время прохождения теста
         if self.timer_seconds:
             total_time = self.timer_seconds - self.time_left
         else:
             total_time = int(time.time() - self.start_time)
         self.show_result_window(total_time if self.timer_seconds else None, percent)
 
+    # === Таймер и обработка времени ===
+    def format_time(self, seconds):
+        # Форматирование времени в строку
+        minutes = seconds // 60
+        secs = seconds % 60
+        return f"Осталось: {minutes:02}:{secs:02}"
+
+    def update_timer(self):
+        # Обновление таймера на экране
+        if self.time_left > 0:
+            self.timer_label.config(text=self.format_time(self.time_left))
+            self.time_left -= 1
+            self.after(1000, self.update_timer)
+        else:
+            self.timer_label.config(text="Время вышло!")
+            self.finish_test_due_to_timeout()
+
+    def finish_test_due_to_timeout(self):
+        # Завершение теста по истечении времени
+        while len(self.answers) < len(self.questions):
+            q = self.questions[len(self.answers)]
+            if len(q["correct_options"]) > 1:
+                self.answers.append([])
+            else:
+                self.answers.append(-1)
+        score = self.calculate_score()
+        percent = (score / len(self.questions)) * 100 if self.questions else 0
+        total_time = self.timer_seconds
+        self.show_result_window(total_time, percent)
+
+    # === Подсчет результатов ===
     def calculate_score(self):
+        # Подсчет количества правильных ответов
         score = 0
         for ans, q in zip(self.answers, self.questions):
             if isinstance(ans, list):
-                # Множественный выбор, сравнение множеств
                 if set(ans) == set(q["correct_options"]):
                     score += 1
             else:
@@ -204,9 +205,10 @@ class TestForm(tk.Toplevel):
         return score
 
     def show_result_window(self, time_seconds, percent):
+        # Отображение окна с результатами теста
         def back_to_student():
-            self.destroy()  # Закрыть окно теста
-            self.student_form.deiconify()  # Показать панель студента
+            self.destroy()
+            self.student_form.deiconify()
         TestResultWindow(
             self,
             db=self.db,
@@ -216,4 +218,15 @@ class TestForm(tk.Toplevel):
             percent=percent,
             back_callback=back_to_student
         )
-        self.withdraw()  # Скрыть форму теста на время показа результатов
+        self.withdraw()
+
+    # === Вспомогательные методы интерфейса ===
+    def _on_mousewheel(self, event):
+        # Прокрутка содержимого с помощью колесика мыши
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _update_wraplength(self):
+        # Адаптация ширины текста под размер окна
+        width = self.canvas.winfo_width() - 120
+        for lbl in self.all_dynamic_labels:
+            lbl.config(wraplength=width if width > 0 else 360)

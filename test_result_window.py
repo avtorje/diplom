@@ -2,17 +2,18 @@ import tkinter as tk
 import datetime
 
 class TestResultWindow(tk.Toplevel):
+    # ---------- Инициализация и конфигурация окна ----------
     def __init__(self, parent, db, user_id, theme_id, time_seconds=None, percent=0, back_callback=None):
         super().__init__(parent)
         self.title("Результаты теста")
         self.geometry("350x220")
         self.resizable(False, False)
         self.configure(bg="#f0f0f0")
-        self.grab_set()
+        self.grab_set()  # Блокирует взаимодействие с другими окнами
 
         self.lift()
         self.attributes('-topmost', True)
-        self.center_window()
+        self.center_window()  # Центрирует окно на экране
 
         self.back_callback = back_callback
         self.db = db
@@ -21,6 +22,7 @@ class TestResultWindow(tk.Toplevel):
         self.percent = percent
         self.time_seconds = time_seconds
 
+        # ---------- Отображение информации о результате теста ----------
         label_title = tk.Label(self, text="Тест завершён!", font=("Arial", 16, "bold"),
                               bg="#f0f0f0", anchor="center", justify="center")
         label_title.pack(pady=(24, 12))
@@ -39,12 +41,13 @@ class TestResultWindow(tk.Toplevel):
                         command=self._on_back)
         btn.pack(pady=0)
 
-        # Сохраняем результат теста сразу при открытии окна (или можно по кнопке)
+        # ---------- Сохранение результата теста ----------
         self.save_result()
 
+    # ---------- Методы работы с базой данных ----------
     def save_result(self):
+        """Сохраняет результат теста в базу данных."""
         date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # Сохраняем в базу: user_id, theme_id, score, date, answers (""), время прохождения, если есть поле elapsed_seconds
         params = [self.user_id, self.theme_id, int(self.percent), date_str, ""]
         query = "INSERT INTO TEST_SUMMARY (user_id, theme_id, score, date, answers"
         if self.time_seconds is not None:
@@ -56,12 +59,16 @@ class TestResultWindow(tk.Toplevel):
         query += ")"
         self.db._execute(query, tuple(params))
 
+    # ---------- Обработка событий ----------
     def _on_back(self):
+        """Закрывает окно и вызывает обратный вызов возврата."""
         self.destroy()
         if self.back_callback:
             self.back_callback()
 
+    # ---------- Вспомогательные методы ----------
     def center_window(self):
+        """Центрирует окно на экране."""
         self.update_idletasks()
         w, h = 350, 220
         x = (self.winfo_screenwidth() // 2) - (w // 2)
